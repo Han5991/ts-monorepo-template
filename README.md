@@ -124,6 +124,9 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 - **Renovate**(`renovate.json`): 매일 아침 최신 버전으로 올린다. 릴리스 뒤 14일이 지난 버전만, 브랜치 보호의 필수
   체크가 초록이면 major까지 자동 머지한다. [Renovate 앱](https://github.com/apps/renovate)을 저장소에 설치하고
   자동 머지를 켜야 돈다(아래 저장소 설정).
+- **업그레이드 관문**(`upgrade-gates.yml`, `upgrade-gates.json`): 생태계가 아직 못 따라온 새 버전(예: typescript-eslint가
+  지원하지 않는 TypeScript)을 매일 찾아 막고, 따라오면 자동으로 푼다. 상한은 막는 패키지의 peer 범위로 계산하고, 새로
+  막힌 것은 Claude가 정말 막히는지 검토한다. `renovate.json`의 관문 규칙은 생성물이다(`pnpm gates sync`).
 
 <!-- module:renovate:end -->
 

@@ -1,0 +1,44 @@
+{
+  "gates": [
+    {
+      "package": "typescript",
+      "allowedVersions": "<7.0.2",
+      "blockers": [
+        {
+          "package": "@typescript-eslint/eslint-plugin",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/parser",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/project-service",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/tsconfig-utils",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/type-utils",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/typescript-estree",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "@typescript-eslint/utils",
+          "range": ">=4.8.4 <6.1.0"
+        },
+        {
+          "package": "typescript-eslint",
+          "range": ">=4.8.4 <6.1.0"
+        }
+      ],
+      "reason": "typescript-eslint가 새 TypeScript를 아직 지원하지 않는다",
+      "checkedAt": "2026-11-09"
+    }
+  ]
+}

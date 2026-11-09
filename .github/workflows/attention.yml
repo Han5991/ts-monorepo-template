@@ -8,7 +8,7 @@ name: Attention
 #   - CI 자동 수정이 실패한 열린 PR(claude-ci-fix의 "CI 자동 수정 실패" 코멘트)
 #   - 하루 넘게 열려 있는 의존성 PR(자동 머지가 안 된 것 — 체크 실패·사람 머지 대기)
 #   - 기본 브랜치에서 최근 실패한 워크플로(Claude 인증 만료 같은 것도 여기 걸린다)
-#   - TypeScript 상한(renovate.json)을 풀 때가 됐는지 — typescript-eslint가 최신 TypeScript를 지원하기 시작하면
+#   (업그레이드 관문을 풀 때는 upgrade-gates.yml이 알아서 푼다 — 여기서 보지 않는다)
 #
 # 멘션 대상은 저장소 변수 ATTENTION_MENTION(없으면 저장소 주인).
 
@@ -63,16 +63,6 @@ jobs:
           gh run list --repo "$GITHUB_REPOSITORY" --branch "${{ github.event.repository.default_branch }}" --limit 50 \
             --json databaseId,workflowName,conclusion,createdAt,url \
             --jq '[.[] | select(.createdAt >= env.SINCE and .workflowName != "Attention")] | group_by(.workflowName) | .[] | max_by(.createdAt) | select(.conclusion == "failure") | "run-\(.workflowName | gsub("[^A-Za-z0-9]"; "-"))-\(.databaseId)\t기본 브랜치에서 실패: [\(.workflowName)](\(.url))"' >> "$items"
-
-          # 4) TypeScript 상한을 풀 때가 됐는가
-          if [[ -f renovate.json ]] && jq -e '.packageRules[]? | select(.matchPackageNames == ["typescript"] and has("allowedVersions"))' renovate.json >/dev/null; then
-            peer="$(curl -fsS https://registry.npmjs.org/typescript-eslint/latest | jq -r '.peerDependencies.typescript // empty')"
-            latest="$(curl -fsS https://registry.npmjs.org/typescript/latest | jq -r '.version')"
-            upper="$(grep -oE '<[0-9.]+' <<<"$peer" | tr -d '<' || true)"
-            if [[ -n "$upper" && -n "$latest" ]] && [[ "$(printf '%s\n%s\n' "$latest" "$upper" | sort -V | head -1)" == "$latest" && "$latest" != "$upper" ]]; then
-              echo -e "ts-$latest\ttypescript-eslint가 TypeScript $latest을 지원한다(peer \`$peer\`) — renovate.json의 typescript 상한 규칙과 ADR 0006을 고칠 때다" >> "$items"
-            fi
-          fi
 
           sort -u -o "$items" "$items"
           echo "항목 $(wc -l < "$items")개"

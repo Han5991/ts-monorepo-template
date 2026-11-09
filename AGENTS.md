@@ -30,6 +30,7 @@
 - [0006](docs/adr/0006-toolchain-and-supply-chain.md) 도구 버전 제약과 공급망 보수
 - [0007](docs/adr/0007-rules-only-in-config.md) 규칙은 설정 파일에서만 바꾼다: 인라인 eslint 주석 금지
 - [0008](docs/adr/0008-automated-dependency-updates.md) 의존성은 Renovate가 늘 최신으로 따라간다
+- [0009](docs/adr/0009-upgrade-gates.md) 생태계가 못 따라온 새 버전은 관문으로 막고, 따라오면 자동으로 푼다
 
 <!-- adr-index:end -->
 

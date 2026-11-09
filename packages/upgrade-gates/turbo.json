@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // 동기화 검사 테스트는 패키지 밖(upgrade-gates.json·renovate.json)을 읽는다. 입력으로 선언하지 않으면
+    // 그 파일만 바뀌었을 때 캐시가 맞아 어긋남을 놓친다.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/upgrade-gates.json",
+        "$TURBO_ROOT$/renovate.json"
+      ]
+    }
+  }
+}

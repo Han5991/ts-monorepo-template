@@ -18,7 +18,7 @@ allowBuilds:
 # pnpm의 minimumReleaseAge(갓 나온 릴리스 설치 보류)를 예외로 풀지 않는다 — 막히면 그 직전
 # 버전으로 적는다(공급망 보수 원칙). minimumReleaseAgeExclude가 자동으로 생기면 지우고 버전을 낮춘다.
 catalog:
-  # 언어 — typescript-eslint 8.x가 typescript <6.1만 지원(2026-11-08 확인)하므로 6.0.x에 둔다.
+  # 언어 — 올릴 수 있는 상한은 upgrade-gates.json이 정한다(Renovate가 따른다).
   typescript: 6.0.3
   '@types/node': ^26.6.6
   zod: ^4.6.7

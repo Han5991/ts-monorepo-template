@@ -39,6 +39,8 @@ interface Module {
   dependencies?: Readonly<Record<string, readonly string[]>>;
   /** 빼면 pnpm-workspace.yaml catalog에서 지우는 이름 */
   catalog?: readonly string[];
+  /** 빼면 루트 package.json에서 지우는 스크립트 이름 */
+  rootScripts?: readonly string[];
   /** 이 모듈을 빼면 함께 빠지는 모듈 */
   takes?: readonly ModuleName[];
 }
@@ -80,14 +82,20 @@ const MODULES = {
       '.github/scripts/check-fix-patch.sh',
       '.github/scripts/check-fix-patch.test.sh',
       '.github/workflows/claude-deps-audit.yml',
-      '.github/scripts/publish-bot-pr.sh',
-      '.github/scripts/publish-bot-pr.test.sh',
       '.claude',
     ],
   },
   renovate: {
-    label: 'Renovate 자동 의존성 업데이트',
-    paths: ['renovate.json', 'docs/adr/0008-automated-dependency-updates.md'],
+    label: 'Renovate 자동 의존성 업데이트와 업그레이드 관문(upgrade-gates)',
+    paths: [
+      'renovate.json',
+      'upgrade-gates.json',
+      'packages/upgrade-gates',
+      '.github/workflows/upgrade-gates.yml',
+      'docs/adr/0008-automated-dependency-updates.md',
+      'docs/adr/0009-upgrade-gates.md',
+    ],
+    rootScripts: ['gates'],
   },
 } as const satisfies Record<ModuleName, Module>;
 
@@ -245,6 +253,12 @@ for (const name of without) {
     removeDependencies(file, names);
   }
   if (module.catalog) removeCatalogEntries(module.catalog);
+  const scripts = module.rootScripts ?? [];
+  if (scripts.length > 0) {
+    editJson('package.json', json => {
+      json['scripts'] = dropKeys(json['scripts'], scripts);
+    });
+  }
 }
 
 gitRemove(TEMPLATE_ONLY);

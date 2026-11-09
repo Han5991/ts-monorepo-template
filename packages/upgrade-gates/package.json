@@ -1,0 +1,28 @@
+{
+  "name": "@app/upgrade-gates",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "의존성 업그레이드 관문: 생태계가 아직 못 따라온 새 버전을 찾아 막고(upgrade-gates.json → renovate.json), 따라오면 푼다.",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "gates": "node src/cli.ts",
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "semver": "7.8.5",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/semver": "^7.7.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

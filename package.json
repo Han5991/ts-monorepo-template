@@ -15,7 +15,8 @@
     "init:project": "node scripts/init.ts",
     "check-types:tooling": "tsc -p tsconfig.json",
     "lint:tooling": "eslint --no-error-on-unmatched-pattern eslint.config.mts scripts",
-    "test:scripts": "bash -c 'shopt -s nullglob; for t in .github/scripts/*.test.sh; do bash \"$t\" || exit 1; done'"
+    "test:scripts": "bash -c 'shopt -s nullglob; for t in .github/scripts/*.test.sh; do bash \"$t\" || exit 1; done'",
+    "gates": "pnpm --filter @app/upgrade-gates gates"
   },
   "devDependencies": {
     "@app/eslint-config": "workspace:*",
