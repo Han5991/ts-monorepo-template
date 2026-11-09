@@ -18,6 +18,10 @@ describe('nextStatus', () => {
 });
 
 describe('countByStatus', () => {
+  it('빈 목록이면 모두 0', () => {
+    expect(countByStatus([])).toEqual({ todo: 0, doing: 0, done: 0 });
+  });
+
   it('상태마다 개수를 센다 — 없는 상태도 0으로 나온다', () => {
     expect(countByStatus([{ status: 'todo' }, { status: 'todo' }])).toEqual({
       todo: 2,
