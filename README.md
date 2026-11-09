@@ -37,9 +37,11 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 
 3. 저장소 설정 — 템플릿으로 복사되지 않으니 새 저장소마다 한 번
    - **브랜치 보호**: `main`에 `Lint / Types / Tests` 체크를 필수로 건다.
-   - **자동 머지 켜기**(Renovate가 GitHub 자동 머지를 쓴다):
-     `gh repo edit --enable-auto-merge --enable-squash-merge --delete-branch-on-merge`
-   - **업데이트 메일 끄기**(선택): `gh api -X PUT repos/<owner>/<repo>/subscription -F ignored=true`
+   - **머지 설정**(Renovate·봇 PR이 GitHub 자동 머지를 쓴다, squash만):
+     `gh repo edit --enable-auto-merge --enable-squash-merge --enable-merge-commit=false --enable-rebase-merge=false --delete-branch-on-merge`
+   - **봇 PR 허용**(의존성 점검이 PR을 연다):
+     `gh api -X PUT repos/<owner>/<repo>/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true`
+   - **알림은 필요할 때만**: 저장소를 Watch하지 않으면(참여·멘션만) `attention.yml`·CI 자동 수정이 멘션할 때만 메일이 온다.
    - [Renovate 앱](https://github.com/apps/renovate)을 이 저장소에 설치한다.
    - `README.md`를 프로젝트 소개로, `AGENTS.md`의 "목적"을 채운다.
 
@@ -100,15 +102,21 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 
 ## 함께 오는 것
 
-- **CI**(`.github/workflows/ci.yml`): lint·타입·테스트·포맷.
+- **CI**(`.github/workflows/ci.yml`): lint·타입·테스트·스크립트 테스트·포맷.
+- **사람이 볼 것**(`attention.yml`): 매일 아침 자동으로 처리하지 못한 것(멈춘 의존성 PR, 기본 브랜치 실패, TypeScript
+  상한을 풀 때)을 이슈 하나에 모으고, **새 항목이 있을 때만** 저장소 주인을 @멘션한다. 저장소 알림을 "참여·멘션만"으로
+  두면 사람이 필요한 날에만 메일이 온다. 멘션 대상은 저장소 변수 `ATTENTION_MENTION`으로 바꿀 수 있다.
 - **에이전트 지침**: `AGENTS.md`(+ `CLAUDE.md` 링크).
 
 <!-- module:claude:start -->
 
-- **Claude 워크플로**: PR 코드 리뷰(`claude-code-review.yml`), `@claude` 멘션 응답(`claude.yml`), PR의 CI가 깨지면 고쳐서
-  다시 검사하고 자동 머지를 거는 `claude-ci-fix.yml`(한 번만 시도, 우회 흔적이 있거나 검사가 실패하면 push하지 않는다), 스킬(`.claude/skills/`,
-  외부 스킬은 각 폴더의 `SOURCE.md`에 출처). 저장소 secret `CLAUDE_CODE_OAUTH_TOKEN`(`claude setup-token`으로 발급)이
-  있어야 돈다 — 없으면 PR마다 리뷰 체크가 실패한다.
+- **Claude 워크플로**(저장소 secret `CLAUDE_CODE_OAUTH_TOKEN` 필요, `claude setup-token`으로 발급):
+  - `claude-code-review.yml` PR 코드 리뷰, `claude.yml` `@claude` 멘션 응답
+  - `claude-ci-fix.yml` PR의 CI가 깨지면 고쳐서 자동 머지를 건다. 읽기 전용 Claude → LLM 없는 검사 → 코드를 실행하지
+    않는 publish로 잡을 나누고, 이미 있는 파일의 수정만 받는다. 한 번만 시도하고, 못 고치면 멘션한다.
+  - `claude-deps-audit.yml` 매주 전이 의존성 취약점을 `pnpm overrides`로 막고 죽은 override를 정리해 PR을 연다(자동 머지).
+    저장소 설정 "Allow GitHub Actions to create and approve pull requests"가 켜져 있어야 한다.
+  - 스킬(`.claude/skills/`, 외부 스킬은 각 폴더의 `SOURCE.md`에 출처)
 
 <!-- module:claude:end -->
 <!-- module:renovate:start -->

@@ -282,6 +282,8 @@ jobs:
       PR_NUMBER: ${{ needs.fix.outputs.number }}
       RESULT: ${{ needs.verify.outputs.result || (needs.fix.outputs.claude == 'success' && 'error' || 'claude-failed') }}
       WHY: ${{ needs.verify.outputs.why }}
+      # 고치지 못하면 바로 멘션한다(attention.yml은 이 항목으로 다시 멘션하지 않는다)
+      MENTION: ${{ vars.ATTENTION_MENTION || github.repository_owner }}
     steps:
       - name: Checkout PR branch
         if: env.RESULT == 'pass'
@@ -345,5 +347,6 @@ jobs:
             echo "## CI 자동 수정 실패 — $title"; echo
             cat "$RUNNER_TEMP/ci-fix/summary.md" 2>/dev/null || true
             echo; echo "실패한 실행: $RUN_URL · 수정 시도: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo; echo "@$MENTION 자동으로 고치지 못해 사람이 볼 차례다."
           } > "$RUNNER_TEMP/comment.md"
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"

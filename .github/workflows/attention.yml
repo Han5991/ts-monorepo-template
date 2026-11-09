@@ -1,0 +1,127 @@
+name: Attention
+
+# 사람이 봐야 할 것을 하루 한 번 이슈 하나("사람이 볼 것")에 모은다. 새 항목이 생겼을 때만 저장소 주인을 @멘션한다 —
+# 저장소 알림을 "참여·멘션만"으로 두면 평소엔 메일이 없고, 사람이 필요한 날만 한 통 온다.
+# LLM 없음. 기본 토큰으로 읽고, 이슈만 쓴다.
+#
+# 모으는 것:
+#   - CI 자동 수정이 실패한 열린 PR(claude-ci-fix의 "CI 자동 수정 실패" 코멘트)
+#   - 하루 넘게 열려 있는 의존성 PR(자동 머지가 안 된 것 — 체크 실패·사람 머지 대기)
+#   - 기본 브랜치에서 최근 실패한 워크플로(Claude 인증 만료 같은 것도 여기 걸린다)
+#   - TypeScript 상한(renovate.json)을 풀 때가 됐는지 — typescript-eslint가 최신 TypeScript를 지원하기 시작하면
+#
+# 멘션 대상은 저장소 변수 ATTENTION_MENTION(없으면 저장소 주인).
+
+on:
+  schedule:
+    # 매일 08:00 KST (23:00 UTC 전날)
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+concurrency:
+  group: attention
+  cancel-in-progress: false
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MENTION: ${{ vars.ATTENTION_MENTION || github.repository_owner }}
+      LABEL: attention
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Collect items
+        run: |
+          set -euo pipefail
+          items="$RUNNER_TEMP/items.tsv"   # 키<TAB>한 줄 설명
+          : > "$items"
+          # gh의 --jq는 --arg를 받지 않는다 — 환경 변수(env.SINCE)로 넘긴다
+          SINCE="$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+          export SINCE
+
+          # 1) CI 자동 수정이 실패한 열린 PR
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title,url,comments \
+            --jq '.[] | select(any(.comments[]; .author.login == "github-actions" and (.body | startswith("## CI 자동 수정 실패")))) | "fixfail-\(.number)\tCI 자동 수정 실패: [#\(.number)](\(.url)) \(.title)"' >> "$items"
+
+          # 2) 하루 넘게 열린 의존성 PR(Renovate·의존성 점검 봇)
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title,url,createdAt,labels,headRefName \
+            --jq '.[] | select(.createdAt < env.SINCE) | select((.labels | any(.name == "dependencies")) or (.headRefName | startswith("claude/deps-audit-"))) | "deps-\(.number)\t머지 안 된 의존성 PR: [#\(.number)](\(.url)) \(.title)"' >> "$items"
+
+          # 3) 기본 브랜치에서 최근 하루 실패한 워크플로(이 워크플로 제외), 워크플로마다 가장 최근 것 하나
+          gh run list --repo "$GITHUB_REPOSITORY" --branch "${{ github.event.repository.default_branch }}" --limit 50 \
+            --json databaseId,workflowName,conclusion,createdAt,url \
+            --jq '[.[] | select(.createdAt >= env.SINCE and .workflowName != "Attention")] | group_by(.workflowName) | .[] | max_by(.createdAt) | select(.conclusion == "failure") | "run-\(.workflowName | gsub("[^A-Za-z0-9]"; "-"))-\(.databaseId)\t기본 브랜치에서 실패: [\(.workflowName)](\(.url))"' >> "$items"
+
+          # 4) TypeScript 상한을 풀 때가 됐는가
+          if [[ -f renovate.json ]] && jq -e '.packageRules[]? | select(.matchPackageNames == ["typescript"] and has("allowedVersions"))' renovate.json >/dev/null; then
+            peer="$(curl -fsS https://registry.npmjs.org/typescript-eslint/latest | jq -r '.peerDependencies.typescript // empty')"
+            latest="$(curl -fsS https://registry.npmjs.org/typescript/latest | jq -r '.version')"
+            upper="$(grep -oE '<[0-9.]+' <<<"$peer" | tr -d '<' || true)"
+            if [[ -n "$upper" && -n "$latest" ]] && [[ "$(printf '%s\n%s\n' "$latest" "$upper" | sort -V | head -1)" == "$latest" && "$latest" != "$upper" ]]; then
+              echo -e "ts-$latest\ttypescript-eslint가 TypeScript $latest을 지원한다(peer \`$peer\`) — renovate.json의 typescript 상한 규칙과 ADR 0006을 고칠 때다" >> "$items"
+            fi
+          fi
+
+          sort -u -o "$items" "$items"
+          echo "항목 $(wc -l < "$items")개"
+          cat "$items"
+
+      - name: Update the issue
+        run: |
+          set -euo pipefail
+          items="$RUNNER_TEMP/items.tsv"
+          gh label create "$LABEL" --repo "$GITHUB_REPOSITORY" --color D93F0B --description '사람이 볼 것(attention.yml)' 2>/dev/null || true
+          issue="$(gh issue list --repo "$GITHUB_REPOSITORY" --label "$LABEL" --state all --limit 1 --json number --jq '.[0].number // empty')"
+
+          # 지난번에 알린 키(본문 끝의 숨은 주석)
+          prev=""
+          if [[ -n "$issue" ]]; then
+            prev="$(gh issue view "$issue" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' | sed -n 's/^<!-- keys: \(.*\) -->$/\1/p' | tr ',' '\n')"
+          fi
+          keys="$(cut -f1 "$items")"
+          # fixfail-은 claude-ci-fix가 실패할 때 이미 멘션했다 — 목록에는 두되 다시 멘션하지 않는다
+          new="$(comm -13 <(printf '%s\n' "$prev" | sort -u) <(printf '%s\n' "$keys" | sort -u) | grep -v '^fixfail-' | grep . || true)"
+
+          body="$RUNNER_TEMP/body.md"
+          {
+            echo "자동으로 처리하지 못해 사람이 볼 것. 매일 아침 \`attention.yml\`이 다시 만든다 — 손으로 고치지 않는다."
+            echo
+            if [[ -s "$items" ]]; then cut -f2 "$items" | sed 's/^/- [ ] /'; else echo "지금은 없다."; fi
+            echo
+            echo "<!-- keys: $(printf '%s' "$keys" | paste -sd ',' -) -->"
+          } > "$body"
+
+          if [[ -z "$issue" ]]; then
+            [[ -s "$items" ]] || { echo "볼 것 없음 — 이슈를 만들지 않는다"; exit 0; }
+            issue="$(gh issue create --repo "$GITHUB_REPOSITORY" --title "사람이 볼 것" --label "$LABEL" --body-file "$body" | sed 's#.*/##')"
+          else
+            gh issue edit "$issue" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          fi
+
+          if [[ -s "$items" ]]; then
+            gh issue reopen "$issue" --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          else
+            gh issue close "$issue" --repo "$GITHUB_REPOSITORY" --reason completed 2>/dev/null || true
+          fi
+
+          # 새 항목이 있을 때만 멘션한다 — 같은 항목으로 매일 메일이 가지 않게
+          if [[ -n "$new" ]]; then
+            {
+              echo "@$MENTION 새로 볼 것이 생겼다:"
+              echo
+              awk -F'\t' 'NR == FNR { want[$0] = 1; next } want[$1] { print "- " $2 }' <(printf '%s\n' "$new") "$items"
+            } > "$RUNNER_TEMP/comment.md"
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/comment.md"
+          fi
