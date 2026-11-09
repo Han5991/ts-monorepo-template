@@ -35,6 +35,16 @@
 
 ## 외부 설정
 
+- `main` 브랜치 보호에 `Lint / Types / Tests` 체크가 필수로 걸려 있어야 한다(저장소 설정 — 코드로 복사되지 않는다).
+
+<!-- module:claude:start -->
+
 - Claude 워크플로(`.github/workflows/claude*.yml`)는 저장소 secret `CLAUDE_CODE_OAUTH_TOKEN`이 있어야 돈다
-  (`claude setup-token`이 만드는 토큰, 유효 기간이 있다). 발급일: <!-- YYYY-MM-DD -->
+  (`claude setup-token`이 만드는 토큰, 유효 기간이 있다). 발급일: (YYYY-MM-DD)
+
+<!-- module:claude:end -->
+<!-- module:renovate:start -->
+
 - Renovate는 GitHub App(https://github.com/apps/renovate)을 이 저장소에 설치해야 돈다.
+
+<!-- module:renovate:end -->
