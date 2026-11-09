@@ -30,6 +30,11 @@ runs:
       shell: bash
       run: pnpm lint:tooling
 
+    # 워크플로가 쓰는 셸 스크립트의 회귀 테스트(있으면)
+    - name: Script tests
+      shell: bash
+      run: pnpm test:scripts
+
     - name: Format check
       if: inputs.format == 'true'
       shell: bash

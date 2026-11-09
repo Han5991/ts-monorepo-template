@@ -77,6 +77,8 @@ const MODULES = {
       '.github/workflows/claude-code-review.yml',
       '.github/workflows/claude-ci-fix.yml',
       '.github/scripts/claude-result-error.py',
+      '.github/scripts/check-fix-patch.sh',
+      '.github/scripts/check-fix-patch.test.sh',
       '.claude',
     ],
   },

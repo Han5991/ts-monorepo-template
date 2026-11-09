@@ -46,4 +46,4 @@ pre-push:
   commands:
     # turbo 호출 하나로 — 셋을 따로 띄우면 같은 작업을 중복 실행한다
     checks:
-      run: pnpm turbo run lint check-types test && pnpm check-types:tooling && pnpm lint:tooling
+      run: pnpm turbo run lint check-types test && pnpm check-types:tooling && pnpm lint:tooling && pnpm test:scripts

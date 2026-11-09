@@ -50,4 +50,5 @@ jobs:
           pnpm turbo run lint check-types test
           pnpm check-types:tooling
           pnpm lint:tooling
+          pnpm test:scripts
           pnpm format:check

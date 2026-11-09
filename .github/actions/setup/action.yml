@@ -5,6 +5,18 @@ description: >-
 
 # 호출 전제: actions/checkout이 끝나 있어야 한다(composite action은 자기 저장소를 checkout할 수 없다).
 
+inputs:
+  cache:
+    description: >-
+      pnpm·turbo 캐시를 쓸지. 모델이 고친 코드나 검증되지 않은 패치를 설치·실행하는 잡은 'false' —
+      workflow_run 잡은 기본 브랜치 범위라, 거기서 저장한 캐시가 이후 모든 CI에 실린다(오염 통로).
+    required: false
+    default: 'true'
+  install:
+    description: 의존성까지 설치할지. pnpm·Node만 필요하면 'false'.
+    required: false
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -15,16 +27,25 @@ runs:
         # 버전은 루트 package.json의 packageManager가 단일 source of truth
         run_install: false
 
-    - name: Setup Node.js
+    - name: Setup Node.js (cached)
+      if: inputs.cache == 'true'
       uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
       with:
         node-version-file: '.tool-versions'
         cache: 'pnpm'
         cache-dependency-path: '**/pnpm-lock.yaml'
 
+    - name: Setup Node.js (no cache)
+      if: inputs.cache != 'true'
+      uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version-file: '.tool-versions'
+
     - name: Caching for Turborepo
+      if: inputs.cache == 'true'
       uses: rharkor/caching-for-turbo@760158c05c47e7a764f78e9a22ca3b5a6ed8c52e # v2.5.2
 
     - name: Install dependencies
+      if: inputs.install == 'true'
       shell: bash
       run: pnpm install --frozen-lockfile
