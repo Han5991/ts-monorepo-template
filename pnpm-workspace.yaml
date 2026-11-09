@@ -43,3 +43,9 @@ catalogs:
     '@eslint-community/eslint-plugin-eslint-comments': ^4.8.1
     # ESLint가 eslint.config.mts를 읽을 때 쓰는 TS 로더
     jiti: ^2.7.0
+
+# 전이 의존성 보안 패치. 의존하는 쪽(eslint, @eslint/config-array, @typescript-eslint/typescript-estree)이
+# minimatch를 ^10으로 묶어 범위 안에서는 패치(>=11.0.1, GHSA-g3hv-75wg-m249)를 받을 수 없다.
+# 지울 조건: 위 패키지들이 minimatch ^11 이상을 허용하는 릴리스가 나오면.
+overrides:
+  minimatch@10: ^11.0.1
