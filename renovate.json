@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "스택을 늘 최신으로 따라간다. 새 릴리스는 14일이 지난 뒤에만 올리고(공급망 보수), minor·patch는 CI가 초록이면 자동 머지, major는 사람과 Claude 리뷰가 본다.",
+  "description": "스택을 늘 최신으로 따라간다. 매일 아침 확인하고, 새 릴리스는 14일이 지난 뒤에만 올리며(공급망 보수), 브랜치 보호의 필수 체크가 초록이면 major까지 자동 머지한다.",
   "extends": [
     "config:recommended",
     ":dependencyDashboard",
@@ -8,15 +8,15 @@
     "helpers:pinGitHubActionDigests"
   ],
   "timezone": "Asia/Seoul",
-  "schedule": ["before 9am on monday"],
+  "schedule": ["before 9am"],
   "labels": ["dependencies"],
   "minimumReleaseAge": "14 days",
   "internalChecksFilter": "strict",
   "prConcurrentLimit": 10,
+  "automerge": true,
+  "platformAutomerge": true,
   "lockFileMaintenance": {
     "enabled": true,
-    "automerge": true,
-    "platformAutomerge": true,
     "schedule": ["before 9am on monday"]
   },
   "vulnerabilityAlerts": {
@@ -32,12 +32,6 @@
       "semanticCommitScope": "ci"
     },
     {
-      "description": "minor·patch는 CI만 보고 자동 머지한다 — pnpm-workspace.yaml의 catalog 포함",
-      "matchUpdateTypes": ["minor", "patch", "digest"],
-      "automerge": true,
-      "platformAutomerge": true
-    },
-    {
       "description": "lint 툴체인은 서로 버전이 맞물려 움직인다 — catalogs.lint를 한 PR로",
       "matchDepTypes": ["pnpm.catalog.lint"],
       "groupName": "lint toolchain"
@@ -48,14 +42,13 @@
       "allowedVersions": "<6.1"
     },
     {
-      "description": "anthropics/claude-code-action은 토큰을 쥐는 액션이라 SHA로 고정하고 사람이 diff를 보고 머지한다",
-      "matchPackageNames": ["anthropics/claude-code-action"],
-      "automerge": false
+      "description": "major에는 deps-major 라벨 — claude-code-review.yml이 breaking change를 이 저장소 코드와 대조해 코멘트를 남긴다(머지는 필수 체크가 정한다)",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["deps-major"]
     },
     {
-      "description": "major는 자동 머지하지 않고 deps-major 라벨을 붙인다 — 이 라벨이 붙은 PR만 claude-code-review.yml이 리뷰한다(breaking change를 이 저장소 코드와 대조)",
-      "matchUpdateTypes": ["major"],
-      "addLabels": ["deps-major"],
+      "description": "anthropics/claude-code-action은 저장소 토큰을 쥐는 액션이라 자동 머지하지 않는다 — 사람이 diff를 보고 머지한다",
+      "matchPackageNames": ["anthropics/claude-code-action"],
       "automerge": false
     }
   ]

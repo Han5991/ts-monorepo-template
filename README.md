@@ -37,6 +37,10 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 
 3. 저장소 설정 — 템플릿으로 복사되지 않으니 새 저장소마다 한 번
    - **브랜치 보호**: `main`에 `Lint / Types / Tests` 체크를 필수로 건다.
+   - **자동 머지 켜기**(Renovate가 GitHub 자동 머지를 쓴다):
+     `gh repo edit --enable-auto-merge --enable-squash-merge --delete-branch-on-merge`
+   - **업데이트 메일 끄기**(선택): `gh api -X PUT repos/<owner>/<repo>/subscription -F ignored=true`
+   - [Renovate 앱](https://github.com/apps/renovate)을 이 저장소에 설치한다.
    - `README.md`를 프로젝트 소개로, `AGENTS.md`의 "목적"을 채운다.
 
 <!-- module:template:end -->
@@ -108,9 +112,9 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 <!-- module:claude:end -->
 <!-- module:renovate:start -->
 
-- **Renovate**(`renovate.json`): 매주 최신 버전으로 올린다. 릴리스 뒤 14일이 지난 버전만, minor·patch는 CI가 초록이면
-  자동 머지(브랜치 보호의 필수 체크를 기다린다), major는 리뷰를 거친다.
-  [Renovate 앱](https://github.com/apps/renovate)을 저장소에 설치해야 돈다.
+- **Renovate**(`renovate.json`): 매일 아침 최신 버전으로 올린다. 릴리스 뒤 14일이 지난 버전만, 브랜치 보호의 필수
+  체크가 초록이면 major까지 자동 머지한다. [Renovate 앱](https://github.com/apps/renovate)을 저장소에 설치하고
+  자동 머지를 켜야 돈다(아래 저장소 설정).
 
 <!-- module:renovate:end -->
 
