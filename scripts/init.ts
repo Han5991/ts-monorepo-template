@@ -1,5 +1,11 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
@@ -146,7 +152,12 @@ const run = (command: string, args: readonly string[]) =>
 
 function gitRemove(paths: readonly string[]) {
   const present = paths.filter(p => existsSync(path.join(ROOT, p)));
-  if (present.length > 0) run('git', ['rm', '-r', '-q', '--', ...present]);
+  if (present.length === 0) return;
+  run('git', ['rm', '-r', '-q', '--ignore-unmatch', '--', ...present]);
+  // git이 추적하지 않는 잔여물(node_modules·.turbo)까지 지운다 — 남으면 폴더가 있는 것처럼 보인다
+  for (const p of present) {
+    rmSync(path.join(ROOT, p), { recursive: true, force: true });
+  }
 }
 
 function editJson(file: string, edit: (json: Record<string, unknown>) => void) {

@@ -71,33 +71,36 @@ describe('도메인', () => {
 // init에서 api 모듈을 빼면 앱이 없으니 건너뛴다
 const USE_CASE = 'apps/api/src/application/use-cases/probe.ts';
 
-describe.skipIf(!existsSync(path.join(ROOT, 'apps/api')))('API 앱', () => {
-  it('양성 대조 — 깨끗한 코드는 통과한다', async () => {
-    expect(
-      await ruleIds(
-        USE_CASE,
-        "import type { Task } from '@app/domain';\nexport const ids = (tasks: Task[]) => tasks.map(t => t.id);\n",
-      ),
-    ).toEqual([]);
-  });
+describe.skipIf(!existsSync(path.join(ROOT, 'apps/api/package.json')))(
+  'API 앱',
+  () => {
+    it('양성 대조 — 깨끗한 코드는 통과한다', async () => {
+      expect(
+        await ruleIds(
+          USE_CASE,
+          "import type { Task } from '@app/domain';\nexport const ids = (tasks: Task[]) => tasks.map(t => t.id);\n",
+        ),
+      ).toEqual([]);
+    });
 
-  it.each([
-    [
-      '애플리케이션이 HTTP 프레임워크를',
-      USE_CASE,
-      "import { Hono } from 'hono';\nexport const app = new Hono();\n",
-    ],
-    [
-      '애플리케이션이 인프라를',
-      USE_CASE,
-      "import { InMemoryTaskRepository } from '#/infrastructure/memory/in-memory-task-repository.ts';\nexport const r = InMemoryTaskRepository;\n",
-    ],
-    [
-      '도메인이 계약을',
-      DOMAIN,
-      "import { ENDPOINTS } from '@app/contracts';\nexport const e = ENDPOINTS;\n",
-    ],
-  ])('%s import하면 막힌다', async (_, file, code) => {
-    expect(await ruleIds(file, code)).toContain('boundaries/dependencies');
-  });
-});
+    it.each([
+      [
+        '애플리케이션이 HTTP 프레임워크를',
+        USE_CASE,
+        "import { Hono } from 'hono';\nexport const app = new Hono();\n",
+      ],
+      [
+        '애플리케이션이 인프라를',
+        USE_CASE,
+        "import { InMemoryTaskRepository } from '#/infrastructure/memory/in-memory-task-repository.ts';\nexport const r = InMemoryTaskRepository;\n",
+      ],
+      [
+        '도메인이 계약을',
+        DOMAIN,
+        "import { ENDPOINTS } from '@app/contracts';\nexport const e = ENDPOINTS;\n",
+      ],
+    ])('%s import하면 막힌다', async (_, file, code) => {
+      expect(await ruleIds(file, code)).toContain('boundaries/dependencies');
+    });
+  },
+);
