@@ -44,8 +44,8 @@
   (`claude setup-token`이 만드는 토큰, 유효 기간이 있다). 발급일: (YYYY-MM-DD)
 
 <!-- module:claude:end -->
-<!-- module:renovate:start -->
+<!-- module:deps:start -->
 
 - Renovate는 GitHub App(https://github.com/apps/renovate)을 이 저장소에 설치해야 돈다.
 
-<!-- module:renovate:end -->
+<!-- module:deps:end -->

@@ -24,25 +24,22 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
    pnpm init:project my-app --without=db,claude  # 묻지 않고 바로
    ```
 
-   | 모듈       | 빼면 지워지는 것                                                                  |
-   | ---------- | --------------------------------------------------------------------------------- |
-   | `api`      | `apps/api`, `contracts`·`api-client`·`http-client`, 관련 ADR (`db`도 함께 빠진다) |
-   | `db`       | `apps/api`의 SqlClient·마이그레이션·SQL 저장소, PGlite 테스트, 관련 ADR           |
-   | `claude`   | Claude 워크플로(PR 코드 리뷰·`@claude` 멘션·CI 자동 수정), `.claude/`             |
-   | `renovate` | `renovate.json`, 관련 ADR                                                         |
+   | 모듈     | 빼면 지워지는 것                                                                  |
+   | -------- | --------------------------------------------------------------------------------- |
+   | `api`    | `apps/api`, `contracts`·`api-client`·`http-client`, 관련 ADR (`db`도 함께 빠진다) |
+   | `db`     | `apps/api`의 SqlClient·마이그레이션·SQL 저장소, PGlite 테스트, 관련 ADR           |
+   | `claude` | Claude 워크플로(PR 코드 리뷰·`@claude` 멘션·CI 자동 수정), `.claude/`             |
 
-   도메인·lint 규칙과 가드 테스트·tsconfig·ADR 색인·lefthook·CI는 늘 남는다. 어떤 조합으로 시작해도 처음부터 검사가
+   도메인·lint 규칙과 가드 테스트·tsconfig·ADR 색인·lefthook·CI는 늘 남는다. 의존성 자동화(Renovate·업그레이드 관문·
+   주간 의존성 점검)는 이 템플릿 저장소 자신을 최신으로 유지하는 데만 쓰고, 초기화 때 늘 지워진다. 어떤 조합으로 시작해도 처음부터 검사가
    통과하는지는 이 템플릿의 CI(`template-init.yml`)가 조합마다 init을 돌려 확인한다. 초기화가 끝나면 이 절과 init
    스크립트는 지워진다.
 
 3. 저장소 설정 — 템플릿으로 복사되지 않으니 새 저장소마다 한 번
    - **브랜치 보호**: `main`에 `Lint / Types / Tests` 체크를 필수로 건다.
-   - **머지 설정**(Renovate·봇 PR이 GitHub 자동 머지를 쓴다, squash만):
+   - **머지 설정**(CI 자동 수정이 GitHub 자동 머지를 쓴다, squash만):
      `gh repo edit --enable-auto-merge --enable-squash-merge --enable-merge-commit=false --enable-rebase-merge=false --delete-branch-on-merge`
-   - **봇 PR 허용**(의존성 점검이 PR을 연다):
-     `gh api -X PUT repos/<owner>/<repo>/actions/permissions/workflow -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true`
    - **알림은 필요할 때만**: 저장소를 Watch하지 않으면(참여·멘션만) `attention.yml`·CI 자동 수정이 멘션할 때만 메일이 온다.
-   - [Renovate 앱](https://github.com/apps/renovate)을 이 저장소에 설치한다.
    - `README.md`를 프로젝트 소개로, `AGENTS.md`의 "목적"을 채운다.
 
 <!-- module:template:end -->
@@ -119,7 +116,7 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
   - 스킬(`.claude/skills/`, 외부 스킬은 각 폴더의 `SOURCE.md`에 출처)
 
 <!-- module:claude:end -->
-<!-- module:renovate:start -->
+<!-- module:deps:start -->
 
 - **Renovate**(`renovate.json`): 매일 아침 최신 버전으로 올린다. 릴리스 뒤 14일이 지난 버전만, 브랜치 보호의 필수
   체크가 초록이면 major까지 자동 머지한다. [Renovate 앱](https://github.com/apps/renovate)을 저장소에 설치하고
@@ -128,7 +125,7 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
   지원하지 않는 TypeScript)을 매일 찾아 막고, 따라오면 자동으로 푼다. 상한은 막는 패키지의 peer 범위로 계산하고, 새로
   막힌 것은 Claude가 정말 막히는지 검토한다. `renovate.json`의 관문 규칙은 생성물이다(`pnpm gates sync`).
 
-<!-- module:renovate:end -->
+<!-- module:deps:end -->
 
 ## 결정 기록
 

@@ -9,12 +9,12 @@ import {
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 
-// pnpm init:project <이름> [--without=api,db,claude,renovate]
+// pnpm init:project <이름> [--without=api,db,claude]
 //
 // 템플릿으로 만든 저장소를 한 번 초기화한다.
 // 1. 고르지 않은 모듈의 파일·의존성·문서 문단을 지운다(--without, 없으면 터미널에서 묻는다).
 // 2. 자리표시자 — 패키지 스코프 `@app/`과 저장소 이름 — 를 이 프로젝트 이름으로 바꾼다.
-// 3. 템플릿 전용 파일(이 스크립트, 템플릿 CI)을 지우고 설치·ADR 색인·포맷을 다시 돌린다.
+// 3. 템플릿 전용 파일(이 스크립트, 템플릿 CI, 템플릿 저장소를 관리하는 의존성 자동화)을 지우고 설치·ADR 색인·포맷을 다시 돌린다.
 //
 // 지우는 것은 `git rm`으로 한다 — ADR 색인(docs-index)이 git이 추적하는 파일만 보기 때문이다.
 
@@ -29,6 +29,8 @@ const TEMPLATE_ONLY = [
   'scripts/init.ts',
   '.github/workflows/template-init.yml',
 ];
+// 템플릿으로 만든 문서에서 늘 지우는 문단(`<!-- module:x:start -->`): 템플릿 사용법, 의존성 자동화
+const ALWAYS_REMOVED_BLOCKS = ['template', 'deps'];
 
 interface Module {
   /** 물을 때 보여 줄 설명 */
@@ -45,7 +47,7 @@ interface Module {
   takes?: readonly ModuleName[];
 }
 
-const MODULE_NAMES = ['api', 'db', 'claude', 'renovate'] as const;
+const MODULE_NAMES = ['api', 'db', 'claude'] as const;
 type ModuleName = (typeof MODULE_NAMES)[number];
 
 const MODULES = {
@@ -81,23 +83,27 @@ const MODULES = {
       '.github/scripts/claude-result-error.py',
       '.github/scripts/check-fix-patch.sh',
       '.github/scripts/check-fix-patch.test.sh',
-      '.github/workflows/claude-deps-audit.yml',
       '.claude',
     ],
   },
-  renovate: {
-    label: 'Renovate 자동 의존성 업데이트와 업그레이드 관문(upgrade-gates)',
-    paths: [
-      'renovate.json',
-      'upgrade-gates.json',
-      'packages/upgrade-gates',
-      '.github/workflows/upgrade-gates.yml',
-      'docs/adr/0008-automated-dependency-updates.md',
-      'docs/adr/0009-upgrade-gates.md',
-    ],
-    rootScripts: ['gates'],
-  },
 } as const satisfies Record<ModuleName, Module>;
+
+// 템플릿 저장소 자신을 최신으로 유지하는 의존성 자동화. 템플릿으로 만든 프로젝트에는 늘 빠진다
+const DEPS_AUTOMATION: Module = {
+  label: '의존성 자동화(Renovate·업그레이드 관문·주간 의존성 점검)',
+  paths: [
+    'renovate.json',
+    'upgrade-gates.json',
+    'packages/upgrade-gates',
+    '.github/workflows/upgrade-gates.yml',
+    '.github/workflows/claude-deps-audit.yml',
+    '.github/scripts/publish-bot-pr.sh',
+    '.github/scripts/publish-bot-pr.test.sh',
+    'docs/adr/0008-automated-dependency-updates.md',
+    'docs/adr/0009-upgrade-gates.md',
+  ],
+  rootScripts: ['gates'],
+};
 
 const isModuleName = (value: string): value is ModuleName =>
   MODULE_NAMES.some(m => m === value);
@@ -111,7 +117,7 @@ function parseArgs(argv: readonly string[]) {
   const [name, ...rest] = argv;
   if (name === undefined || !/^[a-z][a-z0-9-]*$/.test(name)) {
     fail(
-      '사용: pnpm init:project <이름> [--without=api,db,claude,renovate] — 이름은 소문자로 시작하고 소문자·숫자·-만',
+      '사용: pnpm init:project <이름> [--without=api,db,claude] — 이름은 소문자로 시작하고 소문자·숫자·-만',
     );
   }
   let without: Set<ModuleName> | undefined;
@@ -215,13 +221,14 @@ function removeCatalogEntries(names: readonly string[]) {
 
 /**
  * `<!-- module:x:start -->` … `<!-- module:x:end -->` 문단: 뺀 모듈은 통째로, 넣은 모듈은 표시만 지운다.
- * `module:template`은 템플릿 사용법이라 늘 지운다
+ * ALWAYS_REMOVED_BLOCKS(템플릿 사용법·의존성 자동화)는 늘 지운다
  */
 function applyModuleBlocks(text: string, without: ReadonlySet<ModuleName>) {
   const removed = text.replace(
     /^[ \t]*<!-- module:([a-z]+):start -->\n[\s\S]*?^[ \t]*<!-- module:\1:end -->\n/gm,
     (block, name: string) =>
-      name === 'template' || (isModuleName(name) && without.has(name))
+      ALWAYS_REMOVED_BLOCKS.includes(name) ||
+      (isModuleName(name) && without.has(name))
         ? ''
         : block,
   );
@@ -246,8 +253,10 @@ const without = closure(
   args.without ?? (process.stdin.isTTY ? await ask() : new Set()),
 );
 
-for (const name of without) {
-  const module: Module = MODULES[name];
+for (const module of [
+  ...[...without].map((name): Module => MODULES[name]),
+  DEPS_AUTOMATION,
+]) {
   gitRemove(module.paths);
   for (const [file, names] of Object.entries(module.dependencies ?? {})) {
     removeDependencies(file, names);
