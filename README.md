@@ -66,6 +66,14 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 
 필요한 도구: `.tool-versions`의 Node·pnpm(mise·asdf 등).
 
+4. 저장소 설정(템플릿으로 복사되지 않는다 — 새 저장소마다 한 번)
+   - **브랜치 보호**: `main`에 `Lint / Types / Tests` 체크를 필수로. Renovate 자동 머지가 이 체크를 기다린다 — 없으면 CI 결과와
+     상관없이 머지된다.
+   - **Renovate**: [Renovate 앱](https://github.com/apps/renovate)을 저장소에 설치한다.
+   - **Claude 워크플로**: 저장소 secret `CLAUDE_CODE_OAUTH_TOKEN`(`claude setup-token`). 없으면 PR마다 리뷰 체크가 실패한다 —
+     쓰지 않을 거면 `.github/workflows/claude*.yml`을 지운다.
+   - `README.md`를 프로젝트 소개로, `AGENTS.md`의 "목적"을 채운다.
+
 ## 명령
 
 | 명령                                   | 하는 일                                       |

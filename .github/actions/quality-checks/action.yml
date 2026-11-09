@@ -25,6 +25,11 @@ runs:
       shell: bash
       run: pnpm check-types:tooling
 
+    # 루트 도구 파일(eslint.config.mts·scripts/)은 어느 패키지의 lint에도 들지 않는다 — push 전 hook과 같은 검사
+    - name: Lint tooling
+      shell: bash
+      run: pnpm lint:tooling
+
     - name: Format check
       if: inputs.format == 'true'
       shell: bash
