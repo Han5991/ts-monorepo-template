@@ -76,7 +76,7 @@ jobs:
       - name: Run Claude
         id: claude
         if: steps.pr.outputs.skip != 'true'
-        uses: anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13 # v1.0.262
+        uses: anthropics/claude-code-action@61a9c274fa7110a66dfafc1bbbced03833eb25fe # v1.0.269
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           # 이 잡은 GitHub에 쓰지 않는다(커밋·코멘트는 아래 스텝) — 앱 토큰 대신 이 실행의 토큰을 넘긴다
