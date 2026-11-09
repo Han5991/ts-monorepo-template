@@ -1,5 +1,6 @@
 export {
   countByStatus,
+  isDone,
   nextStatus,
   TASK_STATUSES,
   TaskSchema,

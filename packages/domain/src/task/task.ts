@@ -20,6 +20,10 @@ export function nextStatus(status: TaskStatus): TaskStatus {
   return NEXT[status];
 }
 
+export function isDone(task: Pick<Task, 'status'>): boolean {
+  return task.status === 'done';
+}
+
 export function countByStatus(
   tasks: readonly Pick<Task, 'status'>[],
 ): Record<TaskStatus, number> {

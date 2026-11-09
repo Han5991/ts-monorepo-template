@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { countByStatus, nextStatus, TaskSchema } from '#/task/task.ts';
+import { countByStatus, isDone, nextStatus, TaskSchema } from '#/task/task.ts';
+
+describe('isDone', () => {
+  it('done만 끝난 것이다', () => {
+    expect(isDone({ status: 'done' })).toBe(true);
+    expect(isDone({ status: 'doing' })).toBe(false);
+  });
+});
 
 describe('nextStatus', () => {
   it('todo → doing → done으로 나아가고, done은 그대로다', () => {
