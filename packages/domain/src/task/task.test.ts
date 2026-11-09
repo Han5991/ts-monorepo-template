@@ -19,7 +19,6 @@ describe('nextStatus', () => {
 
 describe('countByStatus', () => {
   it('빈 목록이면 모두 0', () => {
-    const empty = [];
     expect(countByStatus([])).toEqual({ todo: 0, doing: 0, done: 0 });
   });
 
