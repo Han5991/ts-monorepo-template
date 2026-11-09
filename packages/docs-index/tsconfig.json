@@ -1,0 +1,9 @@
+{
+  // Node 도구. `pnpm docs:index`가 Node의 타입 제거(type stripping)로 .ts를 바로 실행하므로
+  // 지울 수 없는 TS 문법(enum·매개변수 프로퍼티 등)을 tsc에서 막는다.
+  "extends": "@app/tsconfig/lib.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  }
+}

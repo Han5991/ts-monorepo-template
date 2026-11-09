@@ -1,0 +1,15 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // 색인 검사 테스트는 패키지 밖(AGENTS.md·docs/adr)을 읽는다. 입력으로 선언하지 않으면
+    // 그 파일만 바뀌었을 때 캐시가 맞아 어긋남을 놓친다.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/AGENTS.md",
+        "$TURBO_ROOT$/docs/adr/**"
+      ]
+    }
+  }
+}

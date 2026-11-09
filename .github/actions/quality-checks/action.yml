@@ -1,0 +1,31 @@
+name: Quality checks
+description: >-
+  lint · type check · test · 포맷. PR CI와 (추후) 배포 워크플로가 같은 정의를 쓰도록 한곳에 모은다.
+
+# 재사용 워크플로(workflow_call)가 아니라 composite action인 이유:
+# workflow_call로 빼면 체크 이름이 `<호출 잡 id> / <잡 이름>`으로 바뀌어 required check가 어긋난다.
+#
+# 호출 전제: checkout, pnpm/Node 설치, `pnpm install`이 끝나 있어야 한다.
+
+inputs:
+  format:
+    description: 포맷 검사(prettier)를 돌릴지 여부. 배포는 'false'.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Lint / Type check / Test
+      shell: bash
+      run: pnpm turbo run lint check-types test
+
+    # 패키지마다 있는 eslint.config.mts는 패키지 tsconfig 밖이라 따로 검사한다(공통 lint 설정은 그 패키지 check-types가 본다)
+    - name: Type check tooling configs
+      shell: bash
+      run: pnpm check-types:tooling
+
+    - name: Format check
+      if: inputs.format == 'true'
+      shell: bash
+      run: pnpm format:check

@@ -1,0 +1,20 @@
+# 비밀
+.env
+.env.*
+!.env.example
+
+# 의존성·빌드·캐시
+node_modules/
+dist/
+coverage/
+.turbo/
+.cache/
+*.tsbuildinfo
+*.log
+.DS_Store
+.idea/
+
+# Claude Code 로컬 상태
+.claude/settings.local.json
+.claude/scheduled_tasks.lock
+.claude/worktrees/

@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "스택을 늘 최신으로 따라간다. 새 릴리스는 14일이 지난 뒤에만 올리고(공급망 보수), minor·patch는 CI가 초록이면 자동 머지, major는 사람과 Claude 리뷰가 본다.",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "Asia/Seoul",
+  "schedule": ["before 9am on monday"],
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 10,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "platformAutomerge": true,
+    "schedule": ["before 9am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "description": "보안 수정은 일정·대기 기간을 기다리지 않는다",
+    "minimumReleaseAge": null,
+    "schedule": ["at any time"],
+    "labels": ["security"]
+  },
+  "packageRules": [
+    {
+      "description": "GitHub Actions는 ci scope로 커밋한다(기본 scope는 deps)",
+      "matchManagers": ["github-actions"],
+      "semanticCommitScope": "ci"
+    },
+    {
+      "description": "minor·patch는 CI만 보고 자동 머지한다 — pnpm-workspace.yaml의 catalog 포함",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    {
+      "description": "lint 툴체인은 서로 버전이 맞물려 움직인다 — catalogs.lint를 한 PR로",
+      "matchDepTypes": ["pnpm.catalog.lint"],
+      "groupName": "lint toolchain"
+    },
+    {
+      "description": "typescript-eslint 8.x가 typescript <6.1만 지원한다(2026-11-08 확인) — 지원이 넓어지면 이 규칙을 지운다",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<6.1"
+    },
+    {
+      "description": "anthropics/claude-code-action은 토큰을 쥐는 액션이라 SHA로 고정하고 사람이 diff를 보고 머지한다",
+      "matchPackageNames": ["anthropics/claude-code-action"],
+      "automerge": false
+    },
+    {
+      "description": "major는 자동 머지하지 않고 deps-major 라벨을 붙인다 — 이 라벨이 붙은 PR만 claude-code-review.yml이 리뷰한다(breaking change를 이 저장소 코드와 대조)",
+      "matchUpdateTypes": ["major"],
+      "addLabels": ["deps-major"],
+      "automerge": false
+    }
+  ]
+}

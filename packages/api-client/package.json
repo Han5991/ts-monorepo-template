@@ -1,0 +1,28 @@
+{
+  "name": "@app/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "우리 API의 타입 안전 클라이언트. web과 다른 클라이언트(CLI·봇 등)가 공유한다.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@app/contracts": "workspace:*",
+    "@app/http-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

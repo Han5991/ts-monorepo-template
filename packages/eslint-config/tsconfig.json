@@ -1,0 +1,8 @@
+{
+  // Node에서 도는 ESLint 설정 코드와 그 가드 테스트(guards.test.mts). IDE가 가장 가까운 tsconfig로 이 파일을 보도록 패키지에 둔다
+  "extends": "@app/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["*.mts"]
+}

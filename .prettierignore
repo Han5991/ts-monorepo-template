@@ -1,0 +1,30 @@
+# 빌드 결과물
+dist
+build
+coverage
+*.tsbuildinfo
+
+# Claude Code Action은 default branch와 1바이트라도 다르면 거부 — prettier 손대지 않음
+.github/workflows/claude.yml
+.github/workflows/claude-code-review.yml
+
+# 의존성·캐시
+node_modules
+.pnpm-store
+.turbo
+.cache
+.eslintcache
+
+# 비밀 (커밋 대상 아님)
+.env
+.env.*
+
+# 기타
+*.log
+.idea
+.vscode
+.DS_Store
+pnpm-lock.yaml
+
+# 외부에서 가져온 스킬(출처 판 그대로 둔다 — 각 폴더의 SOURCE.md)
+.claude/skills/web-design-guidelines

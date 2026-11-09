@@ -1,0 +1,8 @@
+{
+  // 클라이언트(브라우저 등)와 서버 양쪽에서 쓰이므로 런타임 전용 타입을 넣지 않는다.
+  // URLSearchParams 타입만 필요해서 DOM lib를 켠다.
+  "extends": "@app/tsconfig/lib.json",
+  "compilerOptions": {
+    "lib": ["esnext", "dom"]
+  }
+}

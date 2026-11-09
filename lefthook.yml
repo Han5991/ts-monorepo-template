@@ -1,0 +1,49 @@
+# Lefthook 설정 — Git hook 관리
+# 참고: https://lefthook.dev/configuration/
+#
+# pre-commit: staged 파일에만 빠른 검증 (prettier 자동 포매팅)
+# pre-push: 전체 워크스페이스에 무거운 검증 (lint + check-types + test, turbo 캐시 활용)
+#
+# 우회: 긴급 시 `LEFTHOOK=0 git commit` 또는 `git commit --no-verify`
+
+pre-commit:
+  # 순서대로: 색인 생성이 AGENTS.md를 쓰므로 prettier와 동시에 돌지 않게 한다
+  piped: true
+  commands:
+    # docs/adr이나 AGENTS.md가 staged 되면 결정 색인을 다시 만든다(어긋나면 CI 테스트가 실패한다)
+    docs-index:
+      priority: 1
+      glob: '{AGENTS.md,docs/adr/*.md}'
+      # ADR만 staged여도 바뀐 AGENTS.md가 함께 커밋되게 명시적으로 stage한다(stage_fixed는 glob에 맞는 staged 파일만 다시 올린다).
+      # 색인은 작업 트리의 ADR 내용으로 만든다. 그 git add가 커밋할 생각이 없던 수정까지 올리거나, stage하지 않은 ADR 수정이
+      # 색인에 섞이지 않도록 AGENTS.md·docs/adr에 unstaged 수정이 있으면 먼저 멈춘다
+      run: >-
+        git diff --quiet -- AGENTS.md docs/adr
+        || { echo "AGENTS.md·docs/adr에 stage하지 않은 수정이 있다 — add하거나 되돌린 뒤 다시 커밋한다"; exit 1; };
+        pnpm docs:index && git add AGENTS.md
+
+    prettier:
+      priority: 2
+      # 루트 파일(`*`)과 하위 디렉터리 파일(`**/*`) 둘 다 매치
+      glob: '{*,**/*}.{ts,mts,tsx,js,jsx,json,md,mjs,cjs,yml,yaml}'
+      # 루트 CLAUDE.md는 AGENTS.md를 가리키는 심볼릭 링크다. prettier는 링크를 파일로
+      # 직접 넘기면 에러를 내므로 제외한다(서식은 원본 AGENTS.md에서 잡힌다)
+      exclude:
+        - CLAUDE.md
+      run: pnpm exec prettier --write {staged_files} --ignore-unknown
+      stage_fixed: true
+
+    # 비밀 파일이 실수로 staged 되면 커밋을 막는다
+    no-secrets:
+      priority: 3
+      glob: '{.env,.env.*,**/.env,**/.env.*,**/.cache/**}'
+      exclude:
+        - .env.example
+        - '**/.env.example'
+      run: 'echo "비밀 파일은 커밋할 수 없다 - {staged_files}" && exit 1'
+
+pre-push:
+  commands:
+    # turbo 호출 하나로 — 셋을 따로 띄우면 같은 작업을 중복 실행한다
+    checks:
+      run: pnpm turbo run lint check-types test && pnpm check-types:tooling && pnpm lint:tooling

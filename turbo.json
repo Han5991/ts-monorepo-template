@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "outputs": ["dist/**"]
+    },
+    // lint·check-types는 의존 패키지의 산출물을 읽지 않는다. 의존 패키지가 바뀌면 해시만
+    // 바뀌도록 빈 transit 태스크로 잇는다.
+    "transit": {
+      "dependsOn": ["^transit"]
+    },
+    // 공통 설정(@app/eslint-config·tsconfig)은 워크스페이스 의존성이라
+    // 바뀌면 transit 해시를 타고 의존 패키지의 캐시가 무효화된다.
+    "lint": {
+      "dependsOn": ["transit"]
+    },
+    "check-types": {
+      "dependsOn": ["transit"]
+    },
+    "test": {
+      "dependsOn": ["transit"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

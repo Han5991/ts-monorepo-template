@@ -1,0 +1,26 @@
+{
+  "name": "@app/docs-index",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "docs/adr의 결정 기록에서 AGENTS.md 결정 색인을 생성하고, 어긋나면 테스트로 실패한다.",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "generate": "node src/cli.ts",
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

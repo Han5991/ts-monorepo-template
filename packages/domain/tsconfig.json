@@ -1,0 +1,4 @@
+{
+  // 브라우저·서버 어디서나 돈다. I/O가 없으므로 런타임 타입을 넣지 않는다.
+  "extends": "@app/tsconfig/lib.json"
+}

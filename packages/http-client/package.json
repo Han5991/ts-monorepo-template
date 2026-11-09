@@ -1,0 +1,27 @@
+{
+  "name": "@app/http-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "공통 fetch 클라이언트: JSON·zod 응답 검증·HttpError·요청 전 훅. 우리 API와 외부 API 호출이 같이 쓴다.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

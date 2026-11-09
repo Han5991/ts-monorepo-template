@@ -1,0 +1,10 @@
+{
+  "name": "@app/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "description": "공통 tsconfig 프리셋. 각 패키지는 \"extends\": \"@app/tsconfig/<프리셋>.json\"으로 상속한다.",
+  "files": [
+    "base.json",
+    "lib.json"
+  ]
+}

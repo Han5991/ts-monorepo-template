@@ -1,0 +1,30 @@
+{
+  // TypeScript 6 기준 (catalog). TS 6부터 `types` 기본값이 [] 이므로 런타임 타입은 각 패키지가 명시한다.
+  // `types`는 그 이름을 해석할 node_modules가 패키지마다 다르므로 프리셋에 두지 않는다.
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["esnext"],
+    "types": [],
+    "noEmit": true,
+    // 패키지 내부 import는 `#/파일.ts`처럼 확장자를 명시한다(package.json imports `#/*` → `./src/*`).
+    // TS·번들러·Node가 같은 문자열을 그대로 해석한다. noEmit이라 허용된다.
+    // imports의 배열 폴백(["./src/*.tsx", "./src/*.ts"])은 TS는 따르지만 따르지 않는 번들러(Vite 8 등)가 있어 쓰지 않는다.
+    "allowImportingTsExtensions": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true
+  },
+  // ${configDir}는 이 프리셋을 extends한 tsconfig의 위치로 풀린다(TS 5.5+). 패키지마다 include를 반복하지 않는다.
+  "include": ["${configDir}/src"]
+}

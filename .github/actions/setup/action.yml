@@ -1,0 +1,30 @@
+name: Setup workspace
+description: >-
+  checkout 이후의 공통 준비(pnpm·Node·turbo 캐시·의존성 설치). 워크플로들이 같은 정의를 쓴다 —
+  액션 SHA와 버전 출처가 한 곳에만 있도록.
+
+# 호출 전제: actions/checkout이 끝나 있어야 한다(composite action은 자기 저장소를 checkout할 수 없다).
+
+runs:
+  using: composite
+  steps:
+    # 액션은 SHA로 고정한다 (Renovate가 올린다)
+    - name: Setup pnpm
+      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      with:
+        # 버전은 루트 package.json의 packageManager가 단일 source of truth
+        run_install: false
+
+    - name: Setup Node.js
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: '.tool-versions'
+        cache: 'pnpm'
+        cache-dependency-path: '**/pnpm-lock.yaml'
+
+    - name: Caching for Turborepo
+      uses: rharkor/caching-for-turbo@2238fae6eb9a9936f92356f54cb3660200d105e7 # v2.5.1
+
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile

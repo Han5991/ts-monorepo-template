@@ -1,0 +1,27 @@
+{
+  "name": "@app/domain",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "도메인: 엔티티·값과 순수 규칙. I/O 없음, web·API가 같이 쓴다.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

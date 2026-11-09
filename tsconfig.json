@@ -1,0 +1,16 @@
+{
+  // 패키지 밖 도구 파일 전용 프로젝트 — 패키지마다 있는 eslint.config.mts와 루트 scripts/.
+  // 패키지 tsconfig는 src만 보므로 여기서 Node 타입으로 검사한다. CI(pnpm check-types:tooling)와 IDE가 같은 설정을 쓴다.
+  "extends": "@app/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    // scripts/는 Node가 타입만 지우고 바로 실행한다 — 지울 수 없는 TS 문법(enum 등)을 막는다
+    "erasableSyntaxOnly": true
+  },
+  "include": [
+    "eslint.config.mts",
+    "apps/*/eslint.config.mts",
+    "packages/*/eslint.config.mts",
+    "scripts"
+  ]
+}

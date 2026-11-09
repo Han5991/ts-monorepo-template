@@ -1,0 +1,45 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# 설치 스크립트는 기본 거부(pnpm 10+). 꼭 필요한 것만 연다.
+allowBuilds:
+  # vitest 경유. 플랫폼 바이너리 확인 스크립트
+  esbuild: true
+  # `pnpm install` 시 git hook 설치(prepare)에 필요
+  lefthook: true
+  # unrs-resolver(eslint-import-resolver-typescript 경유)의 postinstall은 플랫폼 네이티브 바이너리
+  # 폴백 체크다. 바이너리는 optionalDependencies로 이미 설치된다 — 거부.
+  unrs-resolver: false
+
+# 두 개 이상의 워크스페이스 패키지가 쓰는 버전은 전부 여기로 올린다. package.json에는
+# 'catalog:'(기본) 또는 'catalog:<이름>'만 적고 숫자는 이 파일에만 둔다.
+# named catalog는 분류가 아니라 **한 번호로 함께 움직여야 하는 묶음**에만 쓴다.
+# pnpm의 minimumReleaseAge(갓 나온 릴리스 설치 보류)를 예외로 풀지 않는다 — 막히면 그 직전
+# 버전으로 적는다(공급망 보수 원칙). minimumReleaseAgeExclude가 자동으로 생기면 지우고 버전을 낮춘다.
+catalog:
+  # 언어 — typescript-eslint 8.x가 typescript <6.1만 지원(2026-11-08 확인)하므로 6.0.x에 둔다.
+  typescript: 6.0.3
+  '@types/node': ^26.6.6
+  zod: ^4.6.7
+
+  # 런타임
+  hono: ^4.13.16
+
+  # 빌드 · 테스트
+  prettier: ^3.9.10
+  vitest: ^5.1.0
+
+catalogs:
+  # lint 툴체인은 서로 버전이 맞물려 움직인다(eslint ↔ @eslint/js ↔ typescript-eslint).
+  lint:
+    eslint: ^10.14.0
+    '@eslint/js': ^10.0.1
+    typescript-eslint: ^8.72.1
+    # 레이어 경계. boundaries는 import 경로를 실제 파일로 풀어야 하므로 resolver와 함께 움직인다.
+    eslint-plugin-boundaries: ^7.2.0
+    eslint-import-resolver-typescript: ^4.4.5
+    # 인라인 eslint 주석 자체를 오류로(noInlineConfig는 주석을 무시할 뿐이다). peer가 ESLint ^10을 포함한다(4.8.1 확인)
+    '@eslint-community/eslint-plugin-eslint-comments': ^4.8.1
+    # ESLint가 eslint.config.mts를 읽을 때 쓰는 TS 로더
+    jiti: ^2.7.0

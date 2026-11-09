@@ -1,0 +1,32 @@
+{
+  "name": "@app/eslint-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "공통 ESLint 규칙. 각 패키지의 eslint.config.mts가 `base`를 펼치고 자기 규칙만 얹는다.",
+  "exports": {
+    ".": "./index.mts"
+  },
+  "scripts": {
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "catalog:lint",
+    "@eslint/js": "catalog:lint",
+    "eslint-import-resolver-typescript": "catalog:lint",
+    "eslint-plugin-boundaries": "catalog:lint",
+    "typescript-eslint": "catalog:lint"
+  },
+  "peerDependencies": {
+    "eslint": "catalog:lint"
+  },
+  "devDependencies": {
+    "@app/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "eslint": "catalog:lint",
+    "jiti": "catalog:lint",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

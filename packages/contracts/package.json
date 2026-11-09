@@ -1,0 +1,28 @@
+{
+  "name": "@app/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API 계약: 입출력 DTO(zod)와 에러 코드·상태. 서버와 모든 클라이언트가 공유한다.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@app/domain": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

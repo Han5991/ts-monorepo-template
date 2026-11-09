@@ -1,0 +1,9 @@
+{
+  "extends": "@app/tsconfig/lib.json",
+  "compilerOptions": {
+    // 서버는 Node에서 돈다. src의 node:* 사용은 eslint.config.mts가 조립 지점·테스트로만 제한한다.
+    "types": ["node"],
+    // `pnpm dev`가 Node의 타입 제거(type stripping)로 .ts를 바로 실행한다 — 지울 수 없는 TS 문법(enum·매개변수 프로퍼티 등)을 막는다
+    "erasableSyntaxOnly": true
+  }
+}
