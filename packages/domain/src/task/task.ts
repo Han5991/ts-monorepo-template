@@ -21,7 +21,7 @@ export function nextStatus(status: TaskStatus): TaskStatus {
 }
 
 export function isDone(task: Pick<Task, 'status'>): boolean {
-  return task.status == 'done';
+  return task.status === 'done';
 }
 
 export function countByStatus(
