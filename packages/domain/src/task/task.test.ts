@@ -5,6 +5,7 @@ describe('isDone', () => {
   it('done만 끝난 것이다', () => {
     expect(isDone({ status: 'done' })).toBe(true);
     expect(isDone({ status: 'doing' })).toBe(false);
+    expect(isDone({ status: 'todo' })).toBe(false);
   });
 });
 
