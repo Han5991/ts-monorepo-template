@@ -71,10 +71,11 @@ const MODULES = {
     dependencies: { 'apps/api/package.json': ['@electric-sql/pglite'] },
   },
   claude: {
-    label: 'Claude 워크플로(PR 코드 리뷰·@claude 멘션)와 .claude/',
+    label: 'Claude 워크플로(PR 코드 리뷰·@claude 멘션·CI 자동 수정)와 .claude/',
     paths: [
       '.github/workflows/claude.yml',
       '.github/workflows/claude-code-review.yml',
+      '.github/workflows/claude-ci-fix.yml',
       '.github/scripts/claude-result-error.py',
       '.claude',
     ],

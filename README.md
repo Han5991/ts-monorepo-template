@@ -28,7 +28,7 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
    | ---------- | --------------------------------------------------------------------------------- |
    | `api`      | `apps/api`, `contracts`·`api-client`·`http-client`, 관련 ADR (`db`도 함께 빠진다) |
    | `db`       | `apps/api`의 SqlClient·마이그레이션·SQL 저장소, PGlite 테스트, 관련 ADR           |
-   | `claude`   | Claude 워크플로(PR 코드 리뷰·`@claude` 멘션), `.claude/`                          |
+   | `claude`   | Claude 워크플로(PR 코드 리뷰·`@claude` 멘션·CI 자동 수정), `.claude/`             |
    | `renovate` | `renovate.json`, 관련 ADR                                                         |
 
    도메인·lint 규칙과 가드 테스트·tsconfig·ADR 색인·lefthook·CI는 늘 남는다. 어떤 조합으로 시작해도 처음부터 검사가
@@ -105,7 +105,8 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 
 <!-- module:claude:start -->
 
-- **Claude 워크플로**: PR 코드 리뷰(`claude-code-review.yml`)와 `@claude` 멘션 응답(`claude.yml`), 스킬(`.claude/skills/`,
+- **Claude 워크플로**: PR 코드 리뷰(`claude-code-review.yml`), `@claude` 멘션 응답(`claude.yml`), PR의 CI가 깨지면 고쳐서
+  다시 검사하고 자동 머지를 거는 `claude-ci-fix.yml`(한 번만 시도, 우회 흔적이 있거나 검사가 실패하면 push하지 않는다), 스킬(`.claude/skills/`,
   외부 스킬은 각 폴더의 `SOURCE.md`에 출처). 저장소 secret `CLAUDE_CODE_OAUTH_TOKEN`(`claude setup-token`으로 발급)이
   있어야 돈다 — 없으면 PR마다 리뷰 체크가 실패한다.
 
