@@ -11,4 +11,9 @@ API는 렌더링과 무관한 JSON만 내고, 규칙·계산은 `packages/domain
 import해 쓴다(예: 상태별 개수 `countByStatus`). 클라이언트가 늘어도 같은 계산을 다시 짜지 않는다.
 
 UI 프레임워크는 템플릿에 넣지 않는다 — 프로젝트마다 다시 고르는 부분이고, 들어 있으면 걷어내는 비용이 크다.
+
+<!-- module:api:start -->
+
 클라이언트는 `@app/api-client`로 API에 붙는다.
+
+<!-- module:api:end -->
