@@ -3,7 +3,6 @@ import { countByStatus, isDone, nextStatus, TaskSchema } from '#/task/task.ts';
 
 describe('isDone', () => {
   it('done만 끝난 것이다', () => {
-    const statuses = ['todo', 'doing', 'done'];
     expect(isDone({ status: 'done' })).toBe(true);
     expect(isDone({ status: 'doing' })).toBe(false);
     expect(isDone({ status: 'todo' })).toBe(false);
