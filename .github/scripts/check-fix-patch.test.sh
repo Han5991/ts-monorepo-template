@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # check-fix-patch.sh 회귀 테스트. 임시 저장소에서 패치를 만들어 통과·거부를 확인한다.
 set -euo pipefail
+# git 훅(pre-push)이 부르면 GIT_DIR 등이 이 저장소를 가리킨 채 넘어온다 — worktree에서는 절대 경로라 아래 임시 저장소의
+# git init·reset이 진짜 저장소에 적용된다. 이 테스트의 git은 늘 임시 저장소만 보게 지운다.
+unset $(git rev-parse --local-env-vars)
 export LC_ALL=C.UTF-8
 
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/check-fix-patch.sh"
