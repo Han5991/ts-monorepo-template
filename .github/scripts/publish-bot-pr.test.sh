@@ -2,6 +2,9 @@
 # publish-bot-pr.sh 회귀 테스트(CI의 Lint / Types / Tests 잡이 부른다). VERBOSE=1이면 통과한 것의 로그도 찍는다.
 # 가짜 저장소·원격·gh로 시나리오마다 패치를 넘긴다. 필요한 것: bash, git, jq, perl.
 set -euo pipefail
+# git 훅(pre-push)이 부르면 GIT_DIR 등이 이 저장소를 가리킨 채 넘어온다 — worktree에서는 절대 경로라 아래 임시 저장소의
+# git init·branch -M·reset이 진짜 저장소에 적용된다. 이 테스트의 git은 늘 임시 저장소만 보게 지운다.
+unset $(git rev-parse --local-env-vars)
 
 script="$(cd "$(dirname "$0")" && pwd)/publish-bot-pr.sh"
 root="$(mktemp -d "${TMPDIR:-/tmp}/publish-bot-pr-test.XXXXXX")"

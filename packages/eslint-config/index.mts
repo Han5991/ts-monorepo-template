@@ -234,3 +234,157 @@ export function layers(packageDir: string, list: Layer[]) {
     },
   });
 }
+
+// ── 도메인 패키지 ─────────────────────────────────────────────────────────────
+
+/** 도메인 모듈 하나 — 폴더 `src/<type>`, 공개 API는 그 폴더의 `index.ts` */
+export interface DomainModule {
+  /** 모듈 이름 = `src` 아래 폴더 이름(명사) */
+  type: string;
+  /** 이 모듈이 (index.ts로) 쓸 수 있는 다른 도메인 모듈 — 목록에 있는 모듈 이름만 */
+  allow?: string[];
+  /** import할 수 있는 npm 모듈 */
+  externals?: string[];
+}
+
+/** 도메인 `src` 바로 아래에 있어도 되는 폴더 — 테스트 도우미(`TEST_FILES`의 `src/test`). 모듈이 아니다 */
+const DOMAIN_NON_MODULE_FOLDERS = ['test'];
+
+/**
+ * `src` 바로 아래의 폴더·파일과 모듈 목록이 어긋난 곳. 폴더는 모듈 목록과 같아야 하고(테스트 도우미 `test/`는 빼고), 소스 파일은
+ * 배럴(`index.ts`) 하나다 — 목록에 없는 폴더는 배럴 element에 섞여 문(`index.ts`) 규칙 없이 열리고, 바로 아래 소스 파일은 모듈
+ * 경계를 거치지 않는다. 모듈의 `allow`는 목록에 있는 다른 모듈만 가리킨다(오타는 아무것도 안 연 채 조용히 지나간다).
+ */
+export function moduleFolderProblems(
+  folders: readonly string[],
+  files: readonly string[],
+  modules: readonly DomainModule[],
+): string[] {
+  const names = modules.map(module => module.type);
+  const problems: string[] = [];
+  for (const folder of folders) {
+    if (
+      !names.includes(folder) &&
+      !DOMAIN_NON_MODULE_FOLDERS.includes(folder)
+    ) {
+      problems.push(`src/${folder}/ — 모듈 목록(domainLayers)에 없다`);
+    }
+  }
+  for (const name of names) {
+    if (!folders.includes(name)) {
+      problems.push(`모듈 ${name} — src/${name}/ 폴더가 없다`);
+    }
+  }
+  for (const file of files) {
+    if (file !== 'index.ts') {
+      problems.push(
+        `src/${file} — src 바로 아래에는 배럴(index.ts)만 둔다. 규칙은 모듈 폴더에 둔다`,
+      );
+    }
+  }
+  for (const module of modules) {
+    for (const target of module.allow ?? []) {
+      if (target === module.type || !names.includes(target)) {
+        problems.push(
+          `모듈 ${module.type}의 allow: ${target} — 목록에 있는 다른 모듈만 적는다`,
+        );
+      }
+    }
+  }
+  return problems;
+}
+
+/** `src` 바로 아래의 폴더(숨김 폴더 제외)와 소스 파일(테스트·선언 파일 제외) */
+function domainSrcEntries(packageDir: string): {
+  folders: string[];
+  files: string[];
+} {
+  const entries = readdirSync(path.join(packageDir, 'src'), {
+    withFileTypes: true,
+  }).filter(entry => !entry.name.startsWith('.'));
+  return {
+    folders: entries
+      .filter(entry => entry.isDirectory())
+      .map(entry => entry.name),
+    files: entries
+      .filter(
+        entry =>
+          entry.isFile() &&
+          /\.tsx?$/.test(entry.name) &&
+          !/\.(test|d)\.tsx?$/.test(entry.name),
+      )
+      .map(entry => entry.name),
+  };
+}
+
+/**
+ * 도메인 패키지의 레이어 설정 — 모듈마다 element 하나(공개 API = index.ts)와 배럴(src/index.ts). 설정을 읽을 때 `src`의
+ * 폴더·파일과 `allow`가 모듈 목록과 맞는지 보고, 어긋나면 lint가 시작하지 않는다(`moduleFolderProblems`).
+ */
+export function domainLayers(
+  packageDir: string,
+  modules: readonly DomainModule[],
+) {
+  const { folders, files } = domainSrcEntries(packageDir);
+  const problems = moduleFolderProblems(folders, files, modules);
+  if (problems.length > 0) {
+    throw new Error(
+      `도메인 모듈 폴더가 목록과 다르다:\n${problems.join('\n')}`,
+    );
+  }
+  return layers(packageDir, [
+    ...modules.map((module): Layer => ({
+      ...module,
+      pattern: `src/${module.type}`,
+      entry: 'index.ts',
+    })),
+    {
+      type: 'barrel',
+      pattern: 'src',
+      allow: modules.map(module => module.type),
+    },
+  ]);
+}
+
+/**
+ * 도메인은 불러오기만 해서 일어나는 일이 없다(ADR 0011) — 패키지가 `"sideEffects": false`로 번들러에 그렇게 알린다.
+ * 그 전제를 지키는 규칙(허용 목록):
+ * - 모듈 최상위 문장은 import·export와 변수·함수·타입 선언, 타입만인 `declare global`·`declare module`뿐이다.
+ * - 클래스는 쓰지 않는다(선언·식 모두) — static 블록이 불러올 때 돈다. enum도 불러올 때 객체를 만든다.
+ * - 상수의 초기값을 즉시 실행 함수로 만들지 않는다.
+ * 초기값 안에서 부르는 함수가 값을 만들기만 하는지(전역을 바꾸거나 등록하지 않는지)는 이 규칙이 못 본다.
+ */
+export const noTopLevelEffects: Linter.RulesRecord = {
+  'no-restricted-syntax': [
+    'error',
+    {
+      selector:
+        'Program > :not(ImportDeclaration, ExportNamedDeclaration, ExportDefaultDeclaration, ExportAllDeclaration, VariableDeclaration, FunctionDeclaration, TSDeclareFunction, TSTypeAliasDeclaration, TSInterfaceDeclaration, TSModuleDeclaration[declare=true])',
+      message:
+        '도메인 모듈의 최상위에는 선언만 둔다 — 패키지가 부작용 없는 코드로 알려진다(sideEffects: false). 실행할 일은 함수 안에 둔다.',
+    },
+    {
+      selector:
+        'Program > ExportNamedDeclaration > :not(VariableDeclaration, FunctionDeclaration, TSDeclareFunction, TSTypeAliasDeclaration, TSInterfaceDeclaration, ExportSpecifier, Literal)',
+      message:
+        '도메인이 내보내는 것은 변수·함수·타입 선언만이다 — enum은 불러올 때 객체를 만든다(sideEffects: false).',
+    },
+    {
+      selector:
+        'Program > ExportDefaultDeclaration > :not(FunctionDeclaration, Identifier)',
+      message:
+        '도메인이 기본으로 내보내는 것은 함수 선언이나 이미 선언한 이름뿐이다(sideEffects: false).',
+    },
+    {
+      selector: 'ClassDeclaration, ClassExpression',
+      message:
+        '도메인은 클래스를 쓰지 않는다 — static 블록이 불러올 때 돈다(sideEffects: false). 규칙은 함수와 값으로 둔다(ADR 0001).',
+    },
+    {
+      selector:
+        ':matches(Program, Program > ExportNamedDeclaration) > VariableDeclaration > VariableDeclarator > CallExpression.init > :matches(ArrowFunctionExpression.callee, FunctionExpression.callee)',
+      message:
+        '상수의 초기값을 즉시 실행 함수로 만들지 않는다 — 불러올 때 돈다(sideEffects: false). 값을 만드는 함수를 따로 두고 부른다.',
+    },
+  ],
+};

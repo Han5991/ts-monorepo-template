@@ -1,4 +1,10 @@
-import { base, layers, noNodeBuiltins, TEST_FILES } from '@app/eslint-config';
+import {
+  base,
+  domainLayers,
+  noNodeBuiltins,
+  noTopLevelEffects,
+  TEST_FILES,
+} from '@app/eslint-config';
 import { defineConfig } from 'eslint/config';
 
 // 도메인 = 가장 안쪽. 다른 워크스페이스 패키지·프레임워크·I/O를 모른다.
@@ -6,24 +12,19 @@ import { defineConfig } from 'eslint/config';
 export default defineConfig([
   base,
   {
-    files: ['src/**/*.ts'],
+    files: ['src/**/*.{ts,tsx}'],
     ignores: TEST_FILES,
     rules: {
       ...noNodeBuiltins,
+      // 불러오기만 해서 일어나는 일이 없다(ADR 0011, package.json의 sideEffects: false)
+      ...noTopLevelEffects,
       'no-restricted-globals': [
         'error',
         { name: 'fetch', message: '도메인은 I/O를 하지 않는다.' },
       ],
     },
   },
-  // 도메인 모듈마다 element 하나. 다른 모듈은 entry(index.ts)로만 들어온다 — 모듈 안쪽을 바꿔도 밖이 흔들리지 않게
-  layers(import.meta.dirname, [
-    {
-      type: 'task',
-      pattern: 'src/task',
-      externals: ['zod'],
-      entry: 'index.ts',
-    },
-    { type: 'barrel', pattern: 'src', allow: ['task'] },
-  ]),
+  // 명사마다 모듈 하나(ADR 0010). 다른 모듈과 배럴은 그 모듈의 index.ts로만 들어온다 — 모듈 안쪽을 바꿔도 밖이 흔들리지 않게.
+  // 모듈끼리의 방향은 `allow`에 적는다. src 아래 폴더가 이 목록과 다르면 lint가 시작하지 않는다.
+  domainLayers(import.meta.dirname, [{ type: 'task', externals: ['zod'] }]),
 ]);

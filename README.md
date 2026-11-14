@@ -47,6 +47,8 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 ## 무엇이 막히나
 
 - 의존은 바깥 → 안쪽으로만(도메인은 프레임워크·I/O를 모른다) — eslint-plugin-boundaries, 허용 목록만
+- 도메인은 명사마다 모듈 하나, 모듈 밖은 그 모듈의 `index.ts`로만 — `src` 아래 폴더가 모듈 목록과 다르면 lint가 시작하지 않는다
+- 도메인 모듈 최상위에는 선언만(불러오기만 해서 일어나는 일이 없다, `sideEffects: false`) — `no-restricted-syntax` 허용 목록
 - 규칙을 주석으로 끄지 못한다 — `noInlineConfig` + `eslint-comments/no-use`
 - lint 설정이 실제로 막는지 — `packages/eslint-config/guards.test.mts`가 위반을 넣어 확인한다(양성 대조 포함)
 - 상대 경로 import 금지(`#/` 별칭·패키지 이름만) — `no-restricted-imports`
