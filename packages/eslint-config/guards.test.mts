@@ -1,5 +1,6 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { moduleFolderProblems } from '@app/eslint-config';
 import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
@@ -65,6 +66,118 @@ describe('도메인', () => {
         "import { TASK_STATUSES } from './task.ts';\nexport const s = TASK_STATUSES;\n",
       ),
     ).toContain('no-restricted-imports');
+  });
+
+  // 패키지가 sideEffects: false라 번들러가 쓰지 않는 모듈을 통째로 버린다 — 불러올 때 도는 코드가 있으면 조용히 사라진다(ADR 0011)
+  it.each([
+    ['함수 호출', 'console.log(1);\nexport const a = 1;\n'],
+    [
+      'if 문',
+      'if (Date.now() > 0) {\n  globalThis.name = "x";\n}\nexport const a = 1;\n',
+    ],
+    ['내보내는 클래스', 'export class Registry {}\n'],
+    [
+      'static 블록이 있는 클래스 식',
+      'export const R = class {\n  static {\n    globalThis.name = "x";\n  }\n};\n',
+    ],
+    [
+      '즉시 실행 함수로 만든 상수',
+      'export const y = (() => {\n  globalThis.name = "x";\n  return 1;\n})();\n',
+    ],
+    ['내보내는 enum', 'export enum Kind {\n  A,\n}\n'],
+    ['기본으로 내보내는 식', 'export default [1, 2].map(n => n * 2);\n'],
+  ])('도메인 모듈에 둔 %s — 막힌다', async (_, code) => {
+    expect(await ruleIds(DOMAIN, code)).toContain('no-restricted-syntax');
+  });
+
+  it('양성 대조 — 선언(상수·함수·오버로드·기본 내보내기 함수·타입·전역 타입·다시 내보내기)은 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN,
+        [
+          'export function f(a: string): string;',
+          'export function f(a: number): number;',
+          'export function f(a: string | number) {',
+          '  return a;',
+          '}',
+          'export default function g() {',
+          '  return 1;',
+          '}',
+          'export const seen = new Map<string, number>();',
+          'export const doubled = [1, 2].map(n => n * 2);',
+          'export type Id = string;',
+          'declare global {',
+          '  interface Window {',
+          '    probe?: string;',
+          '  }',
+          '}',
+          "export { nextStatus } from '#/task/task.ts';",
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+});
+
+describe('도메인 모듈 폴더', () => {
+  const TASK = { type: 'task' };
+
+  it('폴더·배럴이 모듈 목록과 맞으면 문제가 없다 — 테스트 도우미 폴더(src/test)는 모듈이 아니다', () => {
+    expect(
+      moduleFolderProblems(['task', 'test'], ['index.ts'], [TASK]),
+    ).toEqual([]);
+  });
+
+  it('목록에 없는 폴더, 폴더 없는 모듈, src 바로 아래 소스 파일, 목록에 없는 allow를 알린다', () => {
+    expect(
+      moduleFolderProblems(
+        ['task', 'order'],
+        ['index.ts', 'util.ts'],
+        [
+          { type: 'task', allow: ['tsk'] },
+          { type: 'invoice', allow: ['invoice'] },
+        ],
+      ),
+    ).toEqual([
+      'src/order/ — 모듈 목록(domainLayers)에 없다',
+      '모듈 invoice — src/invoice/ 폴더가 없다',
+      'src/util.ts — src 바로 아래에는 배럴(index.ts)만 둔다. 규칙은 모듈 폴더에 둔다',
+      '모듈 task의 allow: tsk — 목록에 있는 다른 모듈만 적는다',
+      '모듈 invoice의 allow: invoice — 목록에 있는 다른 모듈만 적는다',
+    ]);
+  });
+
+  // 위는 검사 함수다 — 실제 도메인 설정이 그 검사를 거친 모듈 목록으로 레이어를 만드는지는 여기서 본다:
+  // src 아래의 모든 모듈 폴더에 element가 있어야 한다(목록에 없는 폴더가 배럴에 섞이지 않았다)
+  it('도메인 설정은 src 아래 모듈 폴더마다 element를 둔다', async () => {
+    const config: unknown = await eslint.calculateConfigForFile(
+      path.join(ROOT, DOMAIN),
+    );
+    const settings =
+      typeof config === 'object' && config !== null && 'settings' in config
+        ? config.settings
+        : undefined;
+    const elements =
+      typeof settings === 'object' &&
+      settings !== null &&
+      'boundaries/elements' in settings &&
+      Array.isArray(settings['boundaries/elements'])
+        ? settings['boundaries/elements']
+        : [];
+    const patterns = elements.flatMap(element =>
+      typeof element === 'object' && element !== null && 'pattern' in element
+        ? [element.pattern].flat()
+        : [],
+    );
+    const folders = readdirSync(path.join(ROOT, 'packages/domain/src'), {
+      withFileTypes: true,
+    })
+      .filter(entry => entry.isDirectory() && entry.name !== 'test')
+      .map(entry => entry.name);
+    expect(folders.length).toBeGreaterThan(0);
+    for (const folder of folders) {
+      expect(patterns).toContain(`packages/domain/src/${folder}`);
+    }
   });
 });
 

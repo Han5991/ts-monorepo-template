@@ -31,6 +31,12 @@
 - [0007](docs/adr/0007-rules-only-in-config.md) 규칙은 설정 파일에서만 바꾼다: 인라인 eslint 주석 금지
 - [0008](docs/adr/0008-automated-dependency-updates.md) 의존성은 Renovate가 늘 최신으로 따라간다
 - [0009](docs/adr/0009-upgrade-gates.md) 생태계가 못 따라온 새 버전은 관문으로 막고, 따라오면 자동으로 푼다
+- [0010](docs/adr/0010-domain-modules-by-noun.md) 계산의 자리는 쓰는 곳의 수가 아니라 어느 명사의 규칙인가로 정한다
+- [0011](docs/adr/0011-domain-side-effect-free.md) 도메인은 불러오기만 해서 일어나는 일이 없다
+- [0012](docs/adr/0012-feature-screen-folders.md) 화면 앱의 기능 폴더는 화면 단위 하위 폴더로 나누고, 둘 이상의 화면이 쓰는 것은 common에 둔다
+- [0013](docs/adr/0013-app-folder-by-job.md) 화면 앱의 app 폴더는 하는 일로 나눈다
+- [0014](docs/adr/0014-flat-single-door-folders.md) 한 가지 일을 하고 문 하나로만 들어오는 작은 폴더는 하위 폴더로 나누지 않는다
+- [0015](docs/adr/0015-file-suffix-dictionary.md) 화면 앱의 파일 접미사는 한 가지 일을 말한다
 
 <!-- adr-index:end -->
 
