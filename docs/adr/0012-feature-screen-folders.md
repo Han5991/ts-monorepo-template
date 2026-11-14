@@ -7,7 +7,7 @@ status: accepted
 
 ## 결정
 
-템플릿에는 UI 앱이 없다(ADR 0005). 화면 앱(`apps/web` 등)을 더할 때 따른다. 아직 lint가 막지 않는다 — 앱을 더하면 경계
+템플릿에는 UI 앱이 없다(ADR 0005). 화면 앱(`apps/<화면 앱>`)을 더할 때 따른다. 아직 lint가 막지 않는다 — 앱을 더하면 경계
 (`app` → `features` → 공용 `ui`·`@app/domain`, 기능끼리 import 금지)를 `layers()`에 적어 강제한다.
 
 - 기능(`features/<기능>`) 안은 페이지·보기·시트마다 폴더 하나(`list/`·`detail/`·`sheet/`)로 나눈다. 라우트·시트와 1:1이다.

@@ -54,6 +54,7 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - 상대 경로 import 금지(`#/` 별칭·패키지 이름만) — `no-restricted-imports`
 - 엄격 타입(`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes` 등) — `packages/tsconfig/base.json`
 - 결정 기록(ADR) 색인이 AGENTS.md와 맞는다 — 테스트 + 커밋 hook
+- 문서·주석에 백틱으로 적은 저장소 경로(`apps/`·`packages/`·`docs/` 등)가 실제로 있다 — 파일을 옮기면 가리키는 글이 낡지 않게, 테스트
 - 커밋 전 포매팅, 푸시 전 전체 검사 — lefthook
 
 <!-- module:api:start -->
@@ -67,7 +68,7 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - `packages/domain` — 엔티티·순수 규칙(zod만 의존). 서버와 클라이언트가 같이 쓴다
 - `packages/eslint-config` — 공통 lint 규칙 + `layers()` 경계 헬퍼 + 가드 테스트
 - `packages/tsconfig` — 공통 tsconfig 프리셋
-- `packages/docs-index` — `docs/adr` → AGENTS.md 결정 색인 생성·검사
+- `packages/docs-index` — `docs/adr` → AGENTS.md 결정 색인 생성·검사, 문서·주석의 저장소 경로 검사
 - `docs/adr` — 설계 결정 기록
 
 <!-- module:api:start -->
@@ -136,4 +137,10 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 ## 라이선스
 
 [MIT](LICENSE). 템플릿으로 만든 프로젝트의 라이선스는 자유롭게 정하되, 템플릿에서 온 코드의 저작권 표시(`LICENSE`)는
-남긴다. `.claude/skills/`의 외부 스킬은 각 폴더의 `SOURCE.md`·`LICENSE`에 원래 라이선스가 있다.
+남긴다.
+
+<!-- module:claude:start -->
+
+`.claude/skills/`의 외부 스킬은 각 폴더의 `SOURCE.md`·`LICENSE`에 원래 라이선스가 있다.
+
+<!-- module:claude:end -->
