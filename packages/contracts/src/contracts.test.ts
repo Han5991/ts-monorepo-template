@@ -22,7 +22,8 @@ describe('에러 계약', () => {
 });
 
 describe('엔드포인트 계약', () => {
-  it('ENDPOINT_NAMES는 ENDPOINTS의 키 전부다', () => {
+  // 빠진 이름·남는 이름은 DEFINITIONS의 satisfies가 막지만, 이름 튜플에 같은 이름이 두 번 드는 것은 타입이 막지 않는다
+  it('ENDPOINT_NAMES는 ENDPOINTS의 키를 빠짐없이 한 번씩 담는다', () => {
     expect([...ENDPOINT_NAMES].sort()).toEqual(Object.keys(ENDPOINTS).sort());
   });
 

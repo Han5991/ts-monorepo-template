@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -94,32 +94,56 @@ export function docSources(
 const PackageJson = z.object({
   name: z.string().optional(),
   scripts: z.record(z.string(), z.string()).default({}),
-  dependencies: z.record(z.string(), z.string()).default({}),
-  devDependencies: z.record(z.string(), z.string()).default({}),
 });
 
-function readWorkspace(root: string, file: string): Workspace {
-  const raw: unknown = JSON.parse(readFileSync(path.join(root, file), 'utf8'));
+/** 프로젝트 폴더 하나의 package.json과 설치한 도구 */
+function readWorkspace(dir: string): Workspace {
+  const raw: unknown = JSON.parse(
+    readFileSync(path.join(dir, 'package.json'), 'utf8'),
+  );
   const json = PackageJson.parse(raw);
+  const bin = path.join(dir, 'node_modules', '.bin');
   return {
     name: json.name,
     scripts: Object.keys(json.scripts),
-    tools: [
-      ...Object.keys(json.dependencies),
-      ...Object.keys(json.devDependencies),
-    ],
+    // .bin이 없으면(실행 파일을 주는 의존성이 없거나 설치 전) 부를 도구도 없다 — 검사가 엄격해질 뿐 느슨해지지 않는다
+    bins: existsSync(bin) ? readdirSync(bin) : [],
   };
 }
 
-/** 루트와 워크스페이스 패키지(apps·packages 바로 아래)의 package.json */
-export function readWorkspaces(
-  root: string,
-  files: readonly string[],
-): Workspaces {
+/** pnpm ls --json이 내는 프로젝트 — 쓰는 것은 경로뿐이다 */
+const PnpmProjects = z.array(z.object({ path: z.string() }));
+
+/** pnpm을 돌려 JSON 출력을 읽는다 — 다른 글이 섞여 읽지 못하면 무엇이 왔는지 남긴다 */
+function pnpmJson(args: readonly string[], cwd: string): unknown {
+  const stdout = execFileSync('pnpm', args, { cwd, encoding: 'utf8' });
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      `pnpm ${args.join(' ')}의 출력이 JSON이 아니다: ${stdout.slice(0, 200)}`,
+      { cause: error },
+    );
+  }
+}
+
+/**
+ * 루트와 워크스페이스 패키지. 패키지는 pnpm이 pnpm-workspace.yaml의 packages로 찾은 프로젝트다 — glob을 여기에 옮겨 적으면
+ * 그 파일이 바뀔 때 조용히 어긋난다. --depth -1은 의존성 없이 프로젝트만 낸다(pnpm 12.18.0의 pnpm help list, 확인 2026-11-21).
+ */
+export function readWorkspaces(root: string): Workspaces {
+  // pnpm은 심볼릭 링크를 거쳐 들어가도 링크를 푼 경로를 낸다(pnpm 12.18.0으로 확인, 2026-11-21) — 루트도 같은 표기로 바꿔야
+  // 패키지와 가려진다
+  const rootDir = realpathSync(root);
+  const listed = pnpmJson(
+    ['ls', '--recursive', '--depth', '-1', '--json'],
+    rootDir,
+  );
   return {
-    root: readWorkspace(root, 'package.json'),
-    packages: files
-      .filter(file => /^(apps|packages)\/[^/]+\/package\.json$/.test(file))
-      .map(file => readWorkspace(root, file)),
+    root: readWorkspace(rootDir),
+    packages: PnpmProjects.parse(listed)
+      .map(project => project.path)
+      .filter(dir => dir !== rootDir)
+      .map(readWorkspace),
   };
 }

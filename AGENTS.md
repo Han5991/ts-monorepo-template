@@ -11,9 +11,9 @@
 ## 원칙
 
 - **규칙은 실행 경로에 둔다.** 지켜야 할 규칙은 lint·타입·테스트·hook으로 막고, 막을 수 없는 것만 여기 적는다.
-- **우회하지 않는다.** lint·타입 오류는 덮지 않고 고친다. 덮는 문법(단언·`@ts-expect-error`·인라인 eslint 주석)은 lint가
-  막는다(ADR 0007·0016) — lint가 못 막는 길(규칙 끄기·강등, 타입 가드로 속이기)도 같은 우회다. 예외가 꼭 필요하면 설정 파일에
-  좁은 범위와 이유를 적고 PR에서 드러낸다.
+- **우회하지 않는다.** lint·타입 오류는 덮지 않고 고친다. 덮는 문법(단언·타입 서술·확정 대입·`@ts-expect-error`·인라인 eslint
+  주석)은 lint가 막는다(ADR 0007·0016·0018) — lint가 못 막는 길(규칙 끄기·강등, 오버로드·앰비언트 선언으로 타입 속이기)도 같은
+  우회다. 예외가 꼭 필요하면 설정 파일에 좁은 범위와 이유를 적고 PR에서 드러낸다.
 - **출처 없는 외부 사실 금지.** 버전 지원·한도 같은 외부 사실에는 출처 URL과 확인 날짜를 붙인다.
 
 ## 설계 결정
@@ -40,6 +40,7 @@
 - [0015](docs/adr/0015-file-suffix-dictionary.md) 화면 앱의 파일 접미사는 한 가지 일을 말한다
 - [0016](docs/adr/0016-no-type-escape-hatches.md) 타입 오류를 단언(`as`·`!`)이나 `@ts-expect-error`로 덮지 못하게 lint로 막는다
 - [0017](docs/adr/0017-ci-fix-checked-by-test-results.md) CI 자동 수정 패치는 테스트 결과로도 검사한다: 돌던 테스트는 계속 돌고, 실패한 테스트의 파일은 고치지 않는다
+- [0018](docs/adr/0018-unchecked-type-claims.md) 타입 서술(`x is T`·`asserts x`)·확정 대입(`x!: T`)·`declare` 필드도 lint로 막는다
 - [0019](docs/adr/0019-type-checked-lint-everywhere.md) 타입 정보를 쓰는 lint 규칙(any 흘리기·기다리지 않은 promise 등)을 공통 설정에서 모든 TS 파일에 켠다
 
 <!-- adr-index:end -->

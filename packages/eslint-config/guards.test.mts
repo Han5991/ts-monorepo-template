@@ -255,6 +255,139 @@ describe('타입 오류를 덮는 문법', () => {
   });
 });
 
+// 공통 규칙(base)이라 어느 패키지에서나 같다 — 컴파일러가 확인하지 않는 타입 주장도 막힌다(ADR 0018).
+// 매개변수는 `_x`로 쓴다. 타입에서만 쓰는 `x`는 no-unused-vars도 걸어서, 이 규칙이 없어도 막힌 것처럼 보인다
+describe('컴파일러가 확인하지 않는 타입 주장', () => {
+  const PREDICATE = 'local/no-type-predicate';
+  const DEFINITE = 'local/no-definite-assignment-assertion';
+  const DECLARE_FIELD = 'local/no-declare-field';
+  const DOMAIN_TEST = 'packages/domain/src/task/task.test.ts';
+  const TRUE_GUARD =
+    'export const isText = (_x: unknown): _x is string => true;\n';
+
+  it.each([
+    ['참만 돌려주는 가드', TRUE_GUARD, PREDICATE],
+    [
+      '블록 본문의 가드',
+      'export const isText = (_x: unknown): _x is string => {\n  return true;\n};\n',
+      PREDICATE,
+    ],
+    [
+      '함수 선언의 가드',
+      'export function isText(_x: unknown): _x is string {\n  return true;\n}\n',
+      PREDICATE,
+    ],
+    // 오버로드는 구현과 느슨하게만 맞춰 본다 — 서술은 오버로드에 두고 구현은 boolean이어도 컴파일된다
+    [
+      '서술을 붙인 오버로드',
+      'export function isText(x: unknown): x is string;\nexport function isText(_x: unknown): boolean {\n  return true;\n}\n',
+      PREDICATE,
+    ],
+    [
+      'declare function의 서술',
+      'export declare function isText(x: unknown): x is string;\n',
+      PREDICATE,
+    ],
+    // 단언 시그니처는 본문이 던지는지도 보지 않는다 — 빈 본문도 컴파일된다
+    [
+      '본문이 빈 asserts x is T',
+      'export function trust(_x: unknown): asserts _x is string {}\n',
+      PREDICATE,
+    ],
+    [
+      '본문이 빈 asserts x',
+      'export function ok(_c: unknown): asserts _c {}\n',
+      PREDICATE,
+    ],
+    [
+      'this is T',
+      'export interface Shape {\n  isRound(): this is { r: number };\n}\n',
+      PREDICATE,
+    ],
+    [
+      '타입 별칭의 서술',
+      'export type Guard = (x: unknown) => x is string;\n',
+      PREDICATE,
+    ],
+    ['변수의 확정 대입(let x!: T)', 'export let n!: number;\n', DEFINITE],
+    [
+      '필드의 확정 대입(x!: T)',
+      'export class Box {\n  n!: number;\n}\n',
+      DEFINITE,
+    ],
+    [
+      'accessor 필드의 확정 대입',
+      'export class Box {\n  accessor n!: number;\n}\n',
+      DEFINITE,
+    ],
+    [
+      'declare 필드',
+      'export class Box {\n  declare n: number;\n}\n',
+      DECLARE_FIELD,
+    ],
+  ])('%s — 막힌다', async (_, code, rule) => {
+    expect(await ruleIds(DOMAIN, code)).toContain(rule);
+  });
+
+  it.each([
+    [PREDICATE, TRUE_GUARD],
+    [DEFINITE, 'export let n!: number;\n'],
+    [DECLARE_FIELD, 'export class Box {\n  declare n: number;\n}\n'],
+  ])('테스트 파일에서도 막힌다 — %s', async (rule, code) => {
+    expect(await ruleIds(DOMAIN_TEST, code)).toContain(rule);
+  });
+
+  // no-restricted-syntax는 설정 블록마다 통째로 덮어써진다 — 이 규칙들이 공통 설정의 no-restricted-syntax에 있었다면 자기 목록을 둔
+  // 도메인에서 조용히 빠졌다. 이름이 따로라 둘 다 걸린다
+  it('도메인의 최상위 부작용 규칙(no-restricted-syntax)과 함께 걸린다', async () => {
+    const ids = await ruleIds(DOMAIN, `console.log(1);\n${TRUE_GUARD}`);
+    expect(ids).toContain('no-restricted-syntax');
+    expect(ids).toContain(PREDICATE);
+  });
+
+  it('양성 대조 — 추론된 서술, 목록에서 찾아 좁히기, boolean을 돌려주는 함수는 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN,
+        [
+          "export const isText = (x: unknown) => typeof x === 'string';",
+          "export const texts = ['a', 1].filter(x => typeof x === 'string');",
+          "const NAMES = ['a', 'b'] as const;",
+          'export const nameOf = (value: string) => NAMES.find(n => n === value);',
+          'export const isPositive = (n: number): boolean => n > 0;',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  // 도메인 프로덕션 코드는 클래스를 못 쓴다(ADR 0011) — 필드는 같은 base가 도는 테스트 파일 경로에서 본다
+  it('양성 대조 — 초기값, 생성자 대입, | undefined, optional 필드, 나중에 대입하는 let은 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN_TEST,
+        [
+          'export class Counter {',
+          '  count = 0;',
+          '  readonly start: number;',
+          '  last: number | undefined;',
+          '  label?: string;',
+          '  constructor(start: number) {',
+          '    this.start = start;',
+          '  }',
+          '}',
+          'export function pick(flag: boolean) {',
+          '  let chosen: number | undefined;',
+          '  if (flag) chosen = 1;',
+          '  return chosen;',
+          '}',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+});
+
 // 타입 정보를 쓰는 규칙(ADR 0019) — base에 있어 어느 패키지의 어느 TS 파일에서나 같다
 describe('타입 정보를 쓰는 규칙', () => {
   const MEMBER_OF_ANY = '@typescript-eslint/no-unsafe-member-access';

@@ -1,9 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { commandProblem } from '#/docCommands.ts';
 import {
   ADR_DIR,
   adrPaths,
   AGENTS_FILE,
   agentsIndex,
+  readWorkspaces,
   REPO_ROOT,
   trackedFiles,
 } from '#/repo.ts';
@@ -30,5 +41,66 @@ describe('adrPaths', () => {
 
   it('하위 폴더의 파일은 거부한다 — 색인 링크가 깨지지 않게', () => {
     expect(() => adrPaths(['docs/adr/old/0003-a.md'], 'docs/adr')).toThrow();
+  });
+});
+
+describe('readWorkspaces', () => {
+  // pnpm이 실제로 읽는 임시 워크스페이스. 패키지 glob을 이 저장소의 것과 일부러 다르게 둔다
+  const FILES = {
+    'pnpm-workspace.yaml': "packages:\n  - 'tools/*'\n  - '!tools/skipped'\n",
+    'package.json': JSON.stringify({
+      name: 'fixture',
+      devDependencies: { typescript: '1.0.0' },
+    }),
+    // pnpm install이 typescript를 깔며 만드는 실행 파일
+    'node_modules/.bin/tsc': '',
+    'node_modules/.bin/tsserver': '',
+    'tools/kept/package.json': JSON.stringify({ name: '@f/kept' }),
+    'tools/skipped/package.json': JSON.stringify({ name: '@f/skipped' }),
+    'apps/stray/package.json': JSON.stringify({ name: '@f/stray' }),
+  };
+  // 만들고 지우는 것은 이 묶음의 테스트가 돌 때만 한다 — 이름으로 걸러 다른 테스트만 돌려도 임시 폴더가 남지 않는다.
+  // 실행마다 새 폴더라 다시 돌려도 링크가 겹치지 않는다
+  let root: string;
+  let link: string;
+  beforeAll(() => {
+    const base = mkdtempSync(path.join(tmpdir(), 'docs-index-'));
+    root = path.join(base, 'workspace');
+    link = path.join(base, 'link');
+    for (const [file, text] of Object.entries(FILES)) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      writeFileSync(path.join(root, file), text);
+    }
+    symlinkSync(root, link);
+    return () => {
+      rmSync(base, { recursive: true, force: true });
+    };
+  });
+
+  const packageNames = (dir: string) =>
+    readWorkspaces(dir).packages.map(pkg => pkg.name);
+
+  it('패키지는 pnpm-workspace.yaml의 glob이 고른 프로젝트다 — apps·packages를 손으로 적은 목록이 아니다', () => {
+    expect(packageNames(root)).toContain('@f/kept');
+  });
+
+  it('glob 밖이거나 빼는 패턴(!)에 걸린 package.json은 패키지가 아니다', () => {
+    expect(packageNames(root)).toEqual(['@f/kept']);
+  });
+
+  it('심볼릭 링크를 거쳐 받은 루트도 루트로 가린다 — 패키지에 섞지 않는다', () => {
+    expect(packageNames(link)).toEqual(['@f/kept']);
+  });
+
+  it('도구는 node_modules/.bin의 실행 이름이다 — typescript를 깔면 pnpm tsc가 돈다', () => {
+    const workspaces = readWorkspaces(root);
+    expect(workspaces.root.bins.toSorted()).toEqual(['tsc', 'tsserver']);
+    expect(commandProblem('pnpm tsc --noEmit', workspaces)).toBeUndefined();
+  });
+
+  it('실행 이름이 아닌 패키지 이름으로는 돌지 않는다 — pnpm typescript는 거부한다', () => {
+    expect(commandProblem('pnpm typescript', readWorkspaces(root))).toBe(
+      '루트 package.json에 없는 스크립트다: typescript',
+    );
   });
 });
