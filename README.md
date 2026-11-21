@@ -117,7 +117,8 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
 - **Claude 워크플로**(저장소 secret `CLAUDE_CODE_OAUTH_TOKEN` 필요, `claude setup-token`으로 발급):
   - `claude-code-review.yml` PR 코드 리뷰, `claude.yml` `@claude` 멘션 응답
   - `claude-ci-fix.yml` PR의 CI가 깨지면 고쳐서 자동 머지를 건다. 읽기 전용 Claude → LLM 없는 검사 → 코드를 실행하지
-    않는 publish로 잡을 나누고, 앱·패키지의 src·scripts·문서에 이미 있는 파일의 수정만 받는다(설정·lint 규칙·CI는 거부).
+    않는 publish로 잡을 나누고, 앱·패키지의 src·scripts·루트 README에 이미 있는 파일의 수정만 받는다(설정·lint 규칙·
+    에이전트 지침·결정 기록·CI는 거부).
     한 번만 시도하고, 못 고치면 멘션한다.
   - `claude-deps-audit.yml` 매주 전이 의존성 취약점을 pnpm의 `overrides`로 막고 죽은 override를 정리해 PR을 연다(자동 머지).
     저장소 설정 "Allow GitHub Actions to create and approve pull requests"가 켜져 있어야 한다.
