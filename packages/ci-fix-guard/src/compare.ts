@@ -10,7 +10,8 @@ import type { Ledger, LedgerTest } from '#/ledger.ts';
  *   테스트는 보지 않는다.
  * - 패치 전에 실패한 테스트 파일(테스트나 훅이 실패한 파일)은 패치가 고치지 못한다. 그 파일의 스냅샷(__snapshots__/<파일>.snap)도
  *   같다 — 테스트를 실패에 맞추지 말고 테스트가 검사하는 코드를 고친다. 불러오기부터 실패한 파일(테스트가 하나도 수집되지 않은
- *   파일)은 여기에 들지 않는다(import 경로를 고칠 수 있게).
+ *   파일)은 여기에 들지 않는다(import 경로를 고칠 수 있게). 그 테스트가 읽는 다른 기대값 파일(toMatchFileSnapshot 대상·픽스처)은
+ *   보지 않는다 — 보고서가 볼 수 있는 것으로는 고쳐야 할 코드와 가려낼 수 없다(ADR 0017의 못 보는 것).
  * 경로는 repoRoot 기준 상대 경로로 맞춘다(패치의 경로가 저장소 루트 기준이다).
  */
 export function compareLedgers({
@@ -61,14 +62,17 @@ export function compareLedgers({
   }
 
   // 기록이 통째로 없는 패키지는 위에서 한 줄로 알렸다 — 그 안의 테스트를 하나씩 다시 적지 않는다
-  const activeBefore = new Map<string, { title: string; count: number }>();
+  const activeBefore = new Map<
+    string,
+    { file: string; name: string; count: number }
+  >();
   for (const { root, file, test } of tests(before)) {
     if (!isActive(test) || missingRoots.has(root)) continue;
     const id = testId(relative(file), test);
-    const seen = activeBefore.get(id);
     activeBefore.set(id, {
-      title: `${relative(file)} > ${test.name}`,
-      count: (seen?.count ?? 0) + 1,
+      file: relative(file),
+      name: test.name,
+      count: (activeBefore.get(id)?.count ?? 0) + 1,
     });
   }
   const afterById = new Map<string, LedgerTest[]>();
@@ -83,11 +87,10 @@ export function compareLedgers({
         .map(module => relative(module.file)),
     ),
   );
-  for (const [id, { title, count }] of activeBefore) {
+  for (const [id, { file, name, count }] of activeBefore) {
     const now = afterById.get(id) ?? [];
     const missing = count - now.filter(isActive).length;
     if (missing <= 0) continue;
-    const file = title.slice(0, title.indexOf(' > '));
     const inactive = now.find(test => !isActive(test));
     const reason =
       inactive !== undefined
@@ -96,9 +99,9 @@ export function compareLedgers({
           ? '같은 이름의 테스트가 줄었다'
           : erroredAfter.has(file)
             ? '테스트 파일을 불러오지 못했다'
-            : '테스트가 사라졌다(지웠거나 이름을 바꿨다)';
+            : '테스트가 사라졌다(지웠거나 이름을 바꿨다. 테스트를 이름으로 맞추므로 이름이 실행마다 바뀌는 테스트도 여기에 걸린다)';
     problems.push(
-      `${title} — ${reason}${count > 1 ? ` (${String(missing)}개)` : ''}`,
+      `${file} > ${name} — ${reason}${count > 1 ? ` (${String(missing)}개)` : ''}`,
     );
   }
 
