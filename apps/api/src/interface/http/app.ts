@@ -44,7 +44,7 @@ const toTaskDto = ({ id, title, status }: Task): TaskDto => ({
 });
 
 const handlers: Handlers = {
-  health: async () => ({ ok: true }),
+  health: () => Promise.resolve({ ok: true }),
   listTasks: async ({ status }, { tasks }) => ({
     tasks: (await tasks.list(status)).map(toTaskDto),
   }),

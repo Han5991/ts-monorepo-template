@@ -13,9 +13,12 @@ const Ok = (raw: unknown) => OkSchema.parse(raw);
 
 const recording = (status: number, body: string) => {
   const calls: { url: string; init: RequestInit | undefined }[] = [];
-  const fetchImpl: typeof fetch = async (input, init) => {
-    calls.push({ url: String(input), init });
-    return new Response(body, { status });
+  const fetchImpl: typeof fetch = (input, init) => {
+    calls.push({
+      url: input instanceof Request ? input.url : String(input),
+      init,
+    });
+    return Promise.resolve(new Response(body, { status }));
   };
   return { calls, fetchImpl };
 };
@@ -39,8 +42,10 @@ describe('createHttpClient', () => {
   it('decode는 응답 상태·헤더도 받는다(연속 조회 표시 등)', async () => {
     const http = createHttpClient({
       baseUrl: '',
-      fetch: async () =>
-        new Response('{"ok":true}', { headers: { tr_cont: 'M' } }),
+      fetch: () =>
+        Promise.resolve(
+          new Response('{"ok":true}', { headers: { tr_cont: 'M' } }),
+        ),
     });
     expect(
       await http.get('/x', (raw, meta) => [
@@ -222,8 +227,9 @@ describe('createHttpClient', () => {
     const slept: number[] = [];
     const clock = {
       now: () => now,
-      sleep: async (ms: number) => {
+      sleep: (ms: number) => {
         slept.push(ms);
+        return Promise.resolve();
       },
     };
     const { calls, fetchImpl } = recording(200, '{"ok":true}');

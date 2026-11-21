@@ -1,6 +1,7 @@
 {
   // 패키지 밖 도구 파일 전용 프로젝트 — 패키지마다 있는 eslint.config.mts와 루트 scripts/.
-  // 패키지 tsconfig는 src만 보므로 여기서 Node 타입으로 검사한다. CI(pnpm check-types:tooling)와 IDE가 같은 설정을 쓴다.
+  // 패키지 tsconfig는 src만 보므로 여기서 Node 타입으로 검사한다. CI(pnpm check-types:tooling)와 IDE, lint의 타입 정보
+  // 규칙(ADR 0019)이 같은 설정을 쓴다.
   "extends": "@app/tsconfig/base.json",
   "compilerOptions": {
     "types": ["node"],

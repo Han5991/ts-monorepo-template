@@ -1,26 +1,121 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { moduleFolderProblems } from '@app/eslint-config';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // lint 설정이 실제로 막는지 확인한다. 규칙을 지우거나 풀면(예외를 넓히면) 여기서 실패한다 —
 // "설정에 적혀 있다"가 아니라 "위반을 넣으면 오류가 난다"를 증명한다.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
+
+// 이 프로세스는 같은 파일을 내용을 바꿔 가며 여러 번 lint한다 — 한 번만 도는 실행(single run)이 아니다. typescript-eslint는
+// CI(CI=true)에서 single run으로 보고, 내용이 디스크와 같은 파일은 디스크로 만든 Program에서 읽는다. 그러면 탐침 뒤 되돌리기(디스크와
+// 같은 내용)가 project service에 닿지 않아 탐침 내용이 남고, 뒤 검사가 바뀐 타입을 본다(CI에서 API 양성 대조가 그렇게 실패했다)
+process.env.TSESTREE_SINGLE_RUN = 'false';
 const eslint = new ESLint({ cwd: ROOT });
 
-/** 저장소 안의 (없는) 파일 경로로 코드를 lint한다 — 그 경로에 가장 가까운 eslint.config.mts가 적용된다 */
+// 처음 보는 tsconfig 프로젝트를 읽는 검사는 느리다 — CI에서 하나에 7초까지 걸렸다(turbo가 다른 작업을 함께 돌린다). 기본 5초로는
+// 모자라다
+vi.setConfig({ testTimeout: 60_000 });
+
+/**
+ * 저장소에 있는 파일의 경로로, 그 내용 대신 `code`를 lint한다 — 그 경로에 가장 가까운 eslint.config.mts가 적용된다. 디스크의 파일은
+ * 바꾸지 않는다.
+ *
+ * 있는 파일이어야 한다: 타입 정보를 쓰는 규칙은 tsconfig 프로젝트에 든 파일만 파싱하는데, 프로젝트는 디스크에 있는 파일로 만들어진다
+ * (없는 경로는 "project service가 찾지 못했다"는 파싱 오류). 검사한 뒤 그 파일의 실제 내용으로 다시 lint해 되돌린다 — 타입 정보를
+ * 쥔 project service는 프로세스에 하나이고 연 내용을 그대로 들고 있어서, 안 되돌리면 뒤 검사가 이 파일의 타입을 `code`로 본다.
+ * 같은 이유로 탐침은 차례로 돈다고 기댄다(Vitest는 한 파일의 테스트를 차례로 돌린다) — concurrent로 돌리면 되돌리기 전의 탐침 내용을
+ * 다른 검사가 볼 수 있다.
+ */
 async function ruleIds(file: string, code: string): Promise<string[]> {
-  const [result] = await eslint.lintText(code, {
-    filePath: path.join(ROOT, file),
-  });
-  if (!result) throw new Error(`lint 결과가 없다: ${file}`);
+  const filePath = path.join(ROOT, file);
+  if (!existsSync(filePath)) {
+    throw new Error(`탐침은 저장소에 있는 파일 경로로 넣는다: ${file}`);
+  }
+  try {
+    return await errorRuleIds(filePath, code);
+  } finally {
+    await eslint.lintText(readFileSync(filePath, 'utf8'), { filePath });
+  }
+}
+
+/**
+ * 선언 파일 경로로 `code`를 lint한다. 선언 파일은 파일째 막혀(ADR 0020) 저장소에 없으니 `ruleIds`처럼 있는 파일로 넣을 수 없다.
+ * 타입 정보 블록이 선언 파일을 빼므로 project service 없이 파싱되고, 되돌릴 것도 없다. 그 블록에 선언 파일이 다시 들면 없는 경로라
+ * 파싱 오류가 나서 이것을 쓰는 테스트가 실패한다
+ */
+async function declarationFileRuleIds(
+  file: string,
+  code: string,
+): Promise<string[]> {
+  return errorRuleIds(path.join(ROOT, file), code);
+}
+
+/** 오류(severity 2)의 규칙 이름 — 파싱 오류처럼 규칙이 없는 오류는 `(fatal) 메시지`로 */
+async function errorRuleIds(filePath: string, code: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath });
+  if (!result) throw new Error(`lint 결과가 없다: ${filePath}`);
   return result.messages
     .filter(m => m.severity === 2)
     .map(m => m.ruleId ?? `(fatal) ${m.message}`);
 }
 
-const DOMAIN = 'packages/domain/src/task/probe.ts';
+const FILE_KINDS = {
+  source: '소스',
+  test: '테스트',
+  config: '설정 파일(eslint.config.mts)',
+} as const;
+type FileKind = keyof typeof FILE_KINDS;
+
+/**
+ * 루트와 패키지(apps/*·packages/*)마다 lint가 보는 TS 파일을 종류별로 하나씩 — [어디, 종류, 파일]. 패키지 목록은 저장소를 읽어
+ * 만들므로 새 패키지도 저절로 든다. 표본은 각 폴더 바로 아래와 src·scripts 아래에서만 고른다 — 다른 폴더(예: e2e)에만 규칙을 끈
+ * 예외는 여기서 잡히지 않는다. 테스트 이름은 파일이 아니라 어디·종류로 짓는다 — 고른 파일의 이름이 바뀌어도 같은 테스트로 남는다
+ * (CI 자동 수정 검사는 이름이 바뀐 테스트를 사라진 것으로 본다).
+ */
+function oneFilePerKind(): [string, string, string][] {
+  const packages = ['apps', 'packages'].flatMap(group =>
+    existsSync(path.join(ROOT, group))
+      ? readdirSync(path.join(ROOT, group), { withFileTypes: true })
+          .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+          .map(entry => `${group}/${entry.name}`)
+      : [],
+  );
+  const isTs = (name: string) => /\.[cm]?tsx?$/.test(name);
+  const kindOf = (file: string): FileKind =>
+    path.basename(file) === 'eslint.config.mts'
+      ? 'config'
+      : /\.test\.[cm]?tsx?$/.test(file)
+        ? 'test'
+        : 'source';
+  return ['.', ...packages.sort()].flatMap(dir => {
+    const top = readdirSync(path.join(ROOT, dir), { withFileTypes: true })
+      .filter(entry => entry.isFile() && isTs(entry.name))
+      .map(entry => path.join(dir, entry.name));
+    const nested = ['src', 'scripts'].flatMap(sub =>
+      existsSync(path.join(ROOT, dir, sub))
+        ? readdirSync(path.join(ROOT, dir, sub), {
+            recursive: true,
+            encoding: 'utf8',
+          })
+            .filter(isTs)
+            .map(file => path.join(dir, sub, file))
+        : [],
+    );
+    const firstOfKind = new Map<FileKind, string>();
+    for (const file of [...top, ...nested].sort()) {
+      if (!firstOfKind.has(kindOf(file))) firstOfKind.set(kindOf(file), file);
+    }
+    return [...firstOfKind].map(([kind, file]): [string, string, string] => [
+      dir === '.' ? '루트' : dir,
+      FILE_KINDS[kind],
+      file,
+    ]);
+  });
+}
+
+const DOMAIN = 'packages/domain/src/task/index.ts';
 
 describe('도메인', () => {
   it('양성 대조 — 깨끗한 코드는 통과한다', async () => {
@@ -35,7 +130,7 @@ describe('도메인', () => {
   it('도메인 모듈을 공개 API(index.ts)를 거치지 않고 import하면 막힌다', async () => {
     expect(
       await ruleIds(
-        'packages/domain/src/probe.ts',
+        'packages/domain/src/index.ts',
         "import { nextStatus } from '#/task/task.ts';\nexport const n = nextStatus;\n",
       ),
     ).toContain('boundaries/dependencies');
@@ -154,7 +249,7 @@ describe('타입 오류를 덮는 문법', () => {
 
   it('테스트 파일에서도 막힌다', async () => {
     expect(
-      await ruleIds('packages/domain/src/task/probe.test.ts', AS_NUMBER),
+      await ruleIds('packages/domain/src/task/task.test.ts', AS_NUMBER),
     ).toContain(ASSERTION);
   });
 
@@ -185,7 +280,6 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
   const OVERLOAD = 'local/no-overload-signature';
   const AMBIENT = 'local/no-ambient-value';
   const DECLARATION_FILE = 'local/no-declaration-file';
-  // 있는 테스트 파일의 경로로 넣는다 — 그 내용 대신 탐침 코드를 lint한다
   const DOMAIN_TEST = 'packages/domain/src/task/task.test.ts';
   const TRUE_GUARD =
     'export const isText = (_x: unknown): _x is string => true;\n';
@@ -326,9 +420,9 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
     ['CommonJS 선언 파일 .d.cts', 'probe.d.cts', VALUE_CLAIM],
     ['임의 확장자의 선언 파일 .d.css.ts', 'probe.d.css.ts', VALUE_CLAIM],
   ])('%s — 막힌다', async (_, file, code) => {
-    expect(await ruleIds(`packages/domain/src/task/${file}`, code)).toContain(
-      DECLARATION_FILE,
-    );
+    expect(
+      await declarationFileRuleIds(`packages/domain/src/task/${file}`, code),
+    ).toContain(DECLARATION_FILE);
   });
 
   // no-restricted-syntax는 설정 블록마다 통째로 덮어써진다 — 이 규칙들이 공통 설정의 no-restricted-syntax에 있었다면 자기 목록을 둔
@@ -413,6 +507,101 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
   });
 });
 
+// 타입 정보를 쓰는 규칙(ADR 0019) — base에 있어 어느 패키지의 어느 TS 파일에서나 같다
+describe('타입 정보를 쓰는 규칙', () => {
+  const MEMBER_OF_ANY = '@typescript-eslint/no-unsafe-member-access';
+  const READ_NAME =
+    'export const name = (text: string): unknown => JSON.parse(text).name;\n';
+
+  it.each([
+    // 바깥 입력(JSON.parse·res.json() 등)에서 흘러드는 any
+    ['any에서 멤버를 꺼낸다', READ_NAME, MEMBER_OF_ANY],
+    [
+      'any를 타입 있는 변수에 넣는다',
+      'export const read = (text: string) => {\n  const n: number = JSON.parse(text);\n  return n;\n};\n',
+      '@typescript-eslint/no-unsafe-assignment',
+    ],
+    [
+      'any를 타입 있는 인자로 넘긴다',
+      'const twice = (n: number) => n * 2;\nexport const read = (text: string) => twice(JSON.parse(text));\n',
+      '@typescript-eslint/no-unsafe-argument',
+    ],
+    [
+      'any를 타입 있는 반환값으로 돌려준다',
+      'export const read = (text: string): number => JSON.parse(text);\n',
+      '@typescript-eslint/no-unsafe-return',
+    ],
+    [
+      'any를 함수로 부른다',
+      'export const run = (text: string): unknown => JSON.parse(text)();\n',
+      '@typescript-eslint/no-unsafe-call',
+    ],
+    // promise
+    [
+      '기다리지 않은 promise',
+      'const save = (n: number) => Promise.resolve(n);\nexport function run() {\n  save(1);\n}\n',
+      '@typescript-eslint/no-floating-promises',
+    ],
+    [
+      '조건식에 둔 promise',
+      'export const ready = (done: Promise<boolean>) => (done ? 1 : 0);\n',
+      '@typescript-eslint/no-misused-promises',
+    ],
+    [
+      'promise가 아닌 값을 await',
+      'export async function wait() {\n  await 1;\n}\n',
+      '@typescript-eslint/await-thenable',
+    ],
+    [
+      'await 없는 async',
+      'export async function one() {\n  return 1;\n}\n',
+      '@typescript-eslint/require-await',
+    ],
+    // 문자열로 찍으면 '[object Object]'가 되는 값
+    [
+      'String()에 넘긴 객체',
+      'export const label = (value: { id: number }) => String(value);\n',
+      '@typescript-eslint/no-base-to-string',
+    ],
+    [
+      '템플릿에 넣은 객체',
+      'export const label = (value: { id: number }) => `id: ${value}`;\n',
+      '@typescript-eslint/restrict-template-expressions',
+    ],
+  ])('%s — 막힌다', async (_, code, rule) => {
+    expect(await ruleIds(DOMAIN, code)).toContain(rule);
+  });
+
+  it('양성 대조 — unknown으로 받아 좁힌 바깥 입력, 기다린 promise, 숫자를 넣은 템플릿은 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN,
+        [
+          'export const name = (text: string): string | undefined => {',
+          '  const raw: unknown = JSON.parse(text);',
+          "  return typeof raw === 'object' &&",
+          '    raw !== null &&',
+          "    'name' in raw &&",
+          "    typeof raw.name === 'string'",
+          '    ? raw.name',
+          '    : undefined;',
+          '};',
+          'export async function saveOne(save: (n: number) => Promise<void>) {',
+          '  await save(1);',
+          '}',
+          'export const label = (id: number) => `id: ${id}`;',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  // 패키지가 규칙을 끄거나(files 블록) 타입 정보 없이 파싱하면 그 패키지의 파일에서 실패한다
+  it.each(oneFilePerKind())('%s의 %s에서도 막힌다', async (_, __, file) => {
+    expect(await ruleIds(file, READ_NAME), file).toContain(MEMBER_OF_ANY);
+  });
+});
+
 describe('도메인 모듈 폴더', () => {
   const TASK = { type: 'task' };
 
@@ -451,7 +640,8 @@ describe('도메인 모듈 폴더', () => {
       typeof config === 'object' && config !== null && 'settings' in config
         ? config.settings
         : undefined;
-    const elements =
+    // Array.isArray는 unknown을 any[]로 좁힌다 — 원소를 unknown으로 받아 아래에서 좁힌다
+    const elements: unknown[] =
       typeof settings === 'object' &&
       settings !== null &&
       'boundaries/elements' in settings &&
@@ -476,7 +666,7 @@ describe('도메인 모듈 폴더', () => {
 });
 
 // init에서 api 모듈을 빼면 앱이 없으니 건너뛴다
-const USE_CASE = 'apps/api/src/application/use-cases/probe.ts';
+const USE_CASE = 'apps/api/src/application/use-cases/task-queries.ts';
 
 describe.skipIf(!existsSync(path.join(ROOT, 'apps/api/package.json')))(
   'API 앱',
@@ -513,7 +703,7 @@ describe.skipIf(!existsSync(path.join(ROOT, 'apps/api/package.json')))(
 );
 
 // init에서 claude 모듈을 빼면 이 패키지가 없으니 건너뛴다
-const GUARD = 'packages/ci-fix-guard/src/probe.ts';
+const GUARD = 'packages/ci-fix-guard/src/compare.ts';
 
 describe.skipIf(
   !existsSync(path.join(ROOT, 'packages/ci-fix-guard/package.json')),
