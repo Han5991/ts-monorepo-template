@@ -8,6 +8,11 @@ import {
 
 const NoParams = z.object({});
 
+// 엔드포인트 이름. DEFINITIONS가 이 이름을 빠짐없이, 더하지도 않고 갖는지는 satisfies가 본다 — 키 목록을 Object.keys에서
+// 얻으면 string[]이라, EndpointName[]으로 다시 좁히는 데 컴파일러가 확인하지 않는 타입 서술이 필요하다
+export const ENDPOINT_NAMES = ['health', 'listTasks', 'getTask'] as const;
+export type EndpointName = (typeof ENDPOINT_NAMES)[number];
+
 // API 계약의 단일 출처. 서버는 여기 있는 모든 엔드포인트를 구현해야 컴파일되고, 클라이언트는 여기서 호출을 만든다.
 // 경로 규칙(계약 테스트가 강제): 버전 접두 /v1, 자원은 kebab-case 복수, 파생 자원은 원본 아래. 인프라용 /health만 예외.
 // 파라미터: 경로에 :이름으로 있는 것은 경로로, 나머지는 쿼리 문자열로 간다(값이 없는 키는 보내지 않는다).
@@ -30,10 +35,9 @@ const DEFINITIONS = {
     params: z.object({ id: z.string().min(1) }),
     response: TaskDtoSchema,
   },
-} as const;
+} as const satisfies Record<EndpointName, unknown>;
 
 type Definitions = typeof DEFINITIONS;
-export type EndpointName = keyof Definitions;
 export type EndpointParams<N extends EndpointName> = z.infer<
   Definitions[N]['params']
 >;
@@ -54,10 +58,6 @@ export interface Endpoint<Params, Response> {
 export const ENDPOINTS: {
   [N in EndpointName]: Endpoint<EndpointParams<N>, EndpointResponse<N>>;
 } = DEFINITIONS;
-
-const isEndpointName = (key: string): key is EndpointName => key in ENDPOINTS;
-export const ENDPOINT_NAMES: readonly EndpointName[] =
-  Object.keys(ENDPOINTS).filter(isEndpointName);
 
 /** 파라미터 값의 타입. 계약의 params 스키마는 이 범위 안에서만 정의한다 */
 type PathParams = Readonly<Record<string, string | number | undefined>>;
