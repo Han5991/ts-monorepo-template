@@ -20,8 +20,8 @@ status: accepted
 - 가드 테스트(`packages/eslint-config/guards.test.mts`)가 위반마다 막히는지와 `as const`·`satisfies`가 통과하는지(양성 대조)를
   본다.
 - lint가 못 보는 것 — 규칙으로만 남기고 리뷰에서 본다.
-  - 확정 대입 단언(`let x!: T`, 클래스 필드 `x!: T`)과, 확인하지 않고 참을 돌려주는 타입 가드(`x is T`).
   - 라이브러리에서 흘러드는 `any`(`JSON.parse`, `res.json()`). 타입 정보를 쓰는 규칙(`typeChecked`)이 볼 일이다.
+- 확정 대입 단언(`x!: T`)과, 확인하지 않고 참을 돌려주는 타입 가드(`x is T`)는 ADR 0018이 이어서 막는다.
 
 ## 이유
 

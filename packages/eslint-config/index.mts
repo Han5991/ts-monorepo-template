@@ -5,7 +5,52 @@ import js from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import boundaries from 'eslint-plugin-boundaries';
 import tseslint from 'typescript-eslint';
-import type { Linter } from 'eslint';
+import type { Linter, Rule } from 'eslint';
+
+/**
+ * 셀렉터 하나를 막는 규칙. 하는 일은 `no-restricted-syntax`와 같고 규칙 이름만 따로다 — `no-restricted-syntax`는 설정 블록마다
+ * 통째로 덮어써져서, 공통 규칙이 그 이름을 쓰면 자기 목록을 둔 패키지(도메인의 `noTopLevelEffects`)에서 조용히 빠진다.
+ * 이름이 따로면 덮이지 않고, 예외를 열 때도(ADR 0007) 그 규칙 하나만 꺼진다.
+ */
+function bannedSyntax(selector: string, message: string): Rule.RuleModule {
+  return {
+    meta: { type: 'problem', schema: [] },
+    create: context => ({
+      [selector]: (node: Rule.Node) => context.report({ node, message }),
+    }),
+  };
+}
+
+/**
+ * 이 패키지가 정의하는 규칙의 접두(`local/<규칙>`). 워크스페이스 스코프를 접두로 쓰지 않는다 — init이 글에 적힌 스코프를 새
+ * 프로젝트 이름으로 바꾸는데, 문자열을 이어 붙여 만든 접두는 바뀌지 않아 규칙을 가리키는 글(테스트·예외 블록)과 어긋난다
+ */
+const LOCAL_PLUGIN = 'local';
+
+/**
+ * 컴파일러가 확인하지 않는 타입 주장(ADR 0018) — 단언(`as`·`!`, ADR 0016)을 막은 뒤 같은 일을 하는 다른 문법이다.
+ * `base`가 여기 있는 규칙을 전부 켠다.
+ */
+const typeClaims = {
+  rules: {
+    // 함수 본문·오버로드·declare·타입 별칭 어디에 적었든 막는다 — 구현에 붙은 것만 막으면 서술을 붙인 오버로드(구현은
+    // boolean)와 본문이 빈 `asserts`가 그대로 통과한다
+    'no-type-predicate': bannedSyntax(
+      'TSTypePredicate',
+      '타입 서술(`x is T`·`asserts x`)은 컴파일러가 본문을 확인하지 않는 단언이다 — 반환 타입을 적지 않으면 TS가 본문에서 확인한 서술을 추론한다. 목록의 값인지는 목록에서 찾아 돌려주고(`find`), 바깥 입력은 스키마(zod)로 파싱한다(ADR 0018).',
+    ),
+    // 변수·필드·accessor 선언의 `!`. no-non-null-assertion은 식의 `!`(`x!`)만 본다
+    'no-definite-assignment-assertion': bannedSyntax(
+      '[definite=true]',
+      '확정 대입 단언(`x!: T`)은 초기화 검사를 확인 없이 끈다 — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적어 쓰는 곳에서 확인한다(ADR 0018).',
+    ),
+    // `x!: T`와 같은 일을 하는 다른 한 단어. `declare global`·`declare module`(타입만인 선언)은 걸리지 않는다
+    'no-declare-field': bannedSyntax(
+      'PropertyDefinition[declare=true]',
+      '`declare` 필드는 초기화 검사를 끄고, 실행할 때는 필드를 만들지 않는다(값이 undefined다) — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적는다(ADR 0018).',
+    ),
+  },
+};
 
 /**
  * 공통 규칙. 각 앱·패키지는 자기 경로의 eslint.config.mts에서 `base`를 펼치고
@@ -24,7 +69,10 @@ export const base = defineConfig([
   {
     // 규칙은 설정 파일에서만 바뀐다 — 코드 주석(eslint-disable 등)으로 끄는 길을 막아, 예외가 늘 설정 diff로 드러나게.
     // noInlineConfig는 주석을 무시하고 경고만 내므로, "끈 줄 알았는데 안 꺼진" 죽은 주석이 남지 않게 주석 자체를 오류로 만든다
-    plugins: { '@eslint-community/eslint-comments': eslintComments },
+    plugins: {
+      '@eslint-community/eslint-comments': eslintComments,
+      [LOCAL_PLUGIN]: typeClaims,
+    },
     linterOptions: { noInlineConfig: true, reportUnusedInlineConfigs: 'error' },
     rules: {
       '@eslint-community/eslint-comments/no-use': 'error',
@@ -53,6 +101,12 @@ export const base = defineConfig([
         'error',
         { 'ts-expect-error': true },
       ],
+      // 컴파일러가 확인하지 않는 타입 주장(ADR 0018) — typeClaims에 둔 규칙은 빠짐없이 켠다
+      ...Object.fromEntries(
+        Object.keys(typeClaims.rules).map(
+          name => [`${LOCAL_PLUGIN}/${name}`, 'error'] as const,
+        ),
+      ),
     },
   },
 ]);
