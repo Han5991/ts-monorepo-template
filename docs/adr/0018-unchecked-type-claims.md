@@ -33,7 +33,7 @@ status: accepted
     `declare module` 안의 함수·변수. 구현 없이 값이 있고 그 타입이라고 주장한다. `declare global`에 함수를 선언하면 lib 함수에
     오버로드가 더해져 캐스트가 된다(`function parseInt(x: unknown): T`를 더하면 `parseInt(1)`이 `T`로 컴파일된다). 오버로드와
     함께 따로 정한다.
-  - 라이브러리에서 흘러드는 `any`(ADR 0016).
+- 라이브러리에서 흘러드는 `any`는 이 규칙들이 아니라 타입 정보를 쓰는 규칙이 본다(ADR 0019).
 
 ## 이유
 

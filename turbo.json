@@ -14,8 +14,10 @@
     },
     // 공통 설정(@app/eslint-config·tsconfig)은 워크스페이스 의존성이라
     // 바뀌면 transit 해시를 타고 의존 패키지의 캐시가 무효화된다.
+    // 패키지의 eslint.config.mts는 패키지 밖 루트 tsconfig.json(도구 파일 프로젝트)의 타입으로 lint한다 — 그 파일도 입력이다.
     "lint": {
-      "dependsOn": ["transit"]
+      "dependsOn": ["transit"],
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/tsconfig.json"]
     },
     "check-types": {
       "dependsOn": ["transit"]

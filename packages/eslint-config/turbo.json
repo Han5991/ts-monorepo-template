@@ -6,16 +6,11 @@
     "lint": {
       "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/eslint.config.mts"]
     },
-    // 가드 테스트는 패키지 밖의 앱·패키지 lint 설정을 읽는다. 입력으로 선언하지 않으면
-    // 그 설정만 바뀌었을 때(규칙을 지우거나 풀었을 때) 캐시가 맞아 통과해 버린다.
+    // 가드 테스트는 패키지 밖의 앱·패키지 lint 설정에 더해, 탐침을 넣는 파일이 든 tsconfig 프로젝트의 타입(다른 패키지의 소스·
+    // tsconfig·그 패키지가 쓰는 라이브러리의 타입)까지 읽는다 — 입력이 저장소 전부라 캐시하지 않는다. 캐시하면 패키지 밖만
+    // 바뀌었을 때(규칙을 풀었거나 타입이 바뀌었을 때) 지난 결과가 그대로 통과해 버린다.
     "test": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/apps/*/eslint.config.mts",
-        "$TURBO_ROOT$/packages/*/eslint.config.mts",
-        "$TURBO_ROOT$/apps/*/package.json",
-        "$TURBO_ROOT$/packages/*/package.json"
-      ]
+      "cache": false
     }
   }
 }
