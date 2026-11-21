@@ -44,7 +44,8 @@ const typeClaims = {
       '[definite=true]',
       '확정 대입 단언(`x!: T`)은 초기화 검사를 확인 없이 끈다 — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적어 쓰는 곳에서 확인한다(ADR 0018).',
     ),
-    // `x!: T`와 같은 일을 하는 다른 한 단어. `declare global`·`declare module`(타입만인 선언)은 걸리지 않는다
+    // `x!: T`와 같은 일을 하는 다른 한 단어. `declare global`·`declare module` 블록과 최상위 `declare` 값 선언은 보지 않는다
+    // (ADR 0018의 "lint가 못 보는 것")
     'no-declare-field': bannedSyntax(
       'PropertyDefinition[declare=true]',
       '`declare` 필드는 초기화 검사를 끄고, 실행할 때는 필드를 만들지 않는다(값이 undefined다) — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적는다(ADR 0018).',
