@@ -114,6 +114,19 @@ function readWorkspace(dir: string): Workspace {
 /** pnpm ls --json이 내는 프로젝트 — 쓰는 것은 경로뿐이다 */
 const PnpmProjects = z.array(z.object({ path: z.string() }));
 
+/** pnpm을 돌려 JSON 출력을 읽는다 — 다른 글이 섞여 읽지 못하면 무엇이 왔는지 남긴다 */
+function pnpmJson(args: readonly string[], cwd: string): unknown {
+  const stdout = execFileSync('pnpm', args, { cwd, encoding: 'utf8' });
+  try {
+    return JSON.parse(stdout);
+  } catch (error) {
+    throw new Error(
+      `pnpm ${args.join(' ')}의 출력이 JSON이 아니다: ${stdout.slice(0, 200)}`,
+      { cause: error },
+    );
+  }
+}
+
 /**
  * 루트와 워크스페이스 패키지. 패키지는 pnpm이 pnpm-workspace.yaml의 packages로 찾은 프로젝트다 — glob을 여기에 옮겨 적으면
  * 그 파일이 바뀔 때 조용히 어긋난다. --depth -1은 의존성 없이 프로젝트만 낸다(pnpm 12.18.0의 pnpm help list, 확인 2026-11-21).
@@ -122,11 +135,9 @@ export function readWorkspaces(root: string): Workspaces {
   // pnpm은 심볼릭 링크를 거쳐 들어가도 링크를 푼 경로를 낸다(pnpm 12.18.0으로 확인, 2026-11-21) — 루트도 같은 표기로 바꿔야
   // 패키지와 가려진다
   const rootDir = realpathSync(root);
-  const listed: unknown = JSON.parse(
-    execFileSync('pnpm', ['ls', '--recursive', '--depth', '-1', '--json'], {
-      cwd: rootDir,
-      encoding: 'utf8',
-    }),
+  const listed = pnpmJson(
+    ['ls', '--recursive', '--depth', '-1', '--json'],
+    rootDir,
   );
   return {
     root: readWorkspace(rootDir),

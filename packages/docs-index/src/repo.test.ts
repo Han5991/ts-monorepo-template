@@ -7,7 +7,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { commandProblem } from '#/docCommands.ts';
 import {
   ADR_DIR,
@@ -46,9 +46,7 @@ describe('adrPaths', () => {
 
 describe('readWorkspaces', () => {
   // pnpm이 실제로 읽는 임시 워크스페이스. 패키지 glob을 이 저장소의 것과 일부러 다르게 둔다
-  const base = mkdtempSync(path.join(tmpdir(), 'docs-index-'));
-  const root = path.join(base, 'workspace');
-  const files = {
+  const FILES = {
     'pnpm-workspace.yaml': "packages:\n  - 'tools/*'\n  - '!tools/skipped'\n",
     'package.json': JSON.stringify({
       name: 'fixture',
@@ -61,12 +59,22 @@ describe('readWorkspaces', () => {
     'tools/skipped/package.json': JSON.stringify({ name: '@f/skipped' }),
     'apps/stray/package.json': JSON.stringify({ name: '@f/stray' }),
   };
-  for (const [file, text] of Object.entries(files)) {
-    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
-    writeFileSync(path.join(root, file), text);
-  }
-  afterAll(() => {
-    rmSync(base, { recursive: true, force: true });
+  // 만들고 지우는 것은 이 묶음의 테스트가 돌 때만 한다 — 이름으로 걸러 다른 테스트만 돌려도 임시 폴더가 남지 않는다.
+  // 실행마다 새 폴더라 다시 돌려도 링크가 겹치지 않는다
+  let root: string;
+  let link: string;
+  beforeAll(() => {
+    const base = mkdtempSync(path.join(tmpdir(), 'docs-index-'));
+    root = path.join(base, 'workspace');
+    link = path.join(base, 'link');
+    for (const [file, text] of Object.entries(FILES)) {
+      mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+      writeFileSync(path.join(root, file), text);
+    }
+    symlinkSync(root, link);
+    return () => {
+      rmSync(base, { recursive: true, force: true });
+    };
   });
 
   const packageNames = (dir: string) =>
@@ -81,8 +89,6 @@ describe('readWorkspaces', () => {
   });
 
   it('심볼릭 링크를 거쳐 받은 루트도 루트로 가린다 — 패키지에 섞지 않는다', () => {
-    const link = path.join(base, 'link');
-    symlinkSync(root, link);
     expect(packageNames(link)).toEqual(['@f/kept']);
   });
 
