@@ -8,6 +8,7 @@
     ".": "./index.mts"
   },
   "scripts": {
+    "lint": "eslint .",
     "check-types": "tsc -p tsconfig.json",
     "test": "vitest run"
   },

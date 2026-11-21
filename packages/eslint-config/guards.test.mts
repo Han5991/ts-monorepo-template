@@ -119,6 +119,64 @@ describe('도메인', () => {
   });
 });
 
+// 공통 규칙(base)이라 어느 패키지에서나 같다 — 타입 오류를 고치는 대신 덮는 문법은 막힌다(ADR 0016)
+describe('타입 오류를 덮는 문법', () => {
+  const ASSERTION = '@typescript-eslint/consistent-type-assertions';
+  const TS_COMMENT = '@typescript-eslint/ban-ts-comment';
+  const AS_NUMBER = 'export const n = (x: unknown) => x as number;\n';
+
+  it.each([
+    ['as 단언', AS_NUMBER, ASSERTION],
+    ['꺾쇠 단언', 'export const n = (x: unknown) => <number>x;\n', ASSERTION],
+    [
+      'non-null 단언(!)',
+      'export const first = (list: number[]) => list[0]!;\n',
+      '@typescript-eslint/no-non-null-assertion',
+    ],
+    [
+      '설명을 붙인 @ts-expect-error',
+      "// @ts-expect-error 이유를 적어도 막힌다\nexport const a: number = 'x';\n",
+      TS_COMMENT,
+    ],
+    // 바꾼 옵션은 @ts-expect-error 하나다 — 나머지 옵션이 규칙 기본값에서 함께 풀리지 않았는지 본다
+    [
+      '@ts-ignore',
+      "// @ts-ignore 이유를 적어도 막힌다\nexport const a: number = 'x';\n",
+      TS_COMMENT,
+    ],
+    [
+      '@ts-nocheck',
+      "// @ts-nocheck 이유를 적어도 막힌다\nexport const a: number = 'x';\n",
+      TS_COMMENT,
+    ],
+  ])('%s — 막힌다', async (_, code, rule) => {
+    expect(await ruleIds(DOMAIN, code)).toContain(rule);
+  });
+
+  it('테스트 파일에서도 막힌다', async () => {
+    expect(
+      await ruleIds('packages/domain/src/task/probe.test.ts', AS_NUMBER),
+    ).toContain(ASSERTION);
+  });
+
+  it('양성 대조 — as const와 satisfies는 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN,
+        [
+          "export const STATUSES = ['todo', 'done'] as const;",
+          'export const LIMITS = { title: 80 } satisfies Record<string, number>;',
+          "export const LABELS = { todo: '할 일' } as const satisfies Record<",
+          '  string,',
+          '  string',
+          '>;',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('도메인 모듈 폴더', () => {
   const TASK = { type: 'task' };
 

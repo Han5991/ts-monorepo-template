@@ -40,6 +40,19 @@ export const base = defineConfig([
       ],
       // 상대 경로 import 대신 패키지 이름이나 package.json imports(#/)를 쓴다
       'no-restricted-imports': ['error', relativeImportBan()],
+      // 타입 오류를 덮는 문법은 막는다(ADR 0016) — 아래 셋은 컴파일러의 판단을 검증 없이 뒤집는다.
+      // 단언(`x as T`·`<T>x`)은 확인하지 않은 값에 타입을 붙인다. `as const`와 `satisfies`는 타입을 좁히거나 맞춰 볼 뿐이라 걸리지 않는다
+      '@typescript-eslint/consistent-type-assertions': [
+        'error',
+        { assertionStyle: 'never' },
+      ],
+      // `!`는 null·undefined일 수 있다는 오류를 확인 없이 지운다 — 진입점에서 좁히거나 없을 때의 동작을 적는다
+      '@typescript-eslint/no-non-null-assertion': 'error',
+      // `@ts-expect-error`는 설명을 붙여도 그 줄의 오류를 무엇이든 삼킨다(나중에 생긴 다른 오류까지). 나머지 옵션은 규칙 기본값 그대로다
+      '@typescript-eslint/ban-ts-comment': [
+        'error',
+        { 'ts-expect-error': true },
+      ],
     },
   },
 ]);
