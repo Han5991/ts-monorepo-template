@@ -297,7 +297,11 @@ jobs:
             pnpm check-types:tooling && pnpm lint:tooling && pnpm format:check; }; then
             echo "result=fail" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          # 패치 전에 돌던 테스트가 꺼졌거나 패치 전에 실패한 테스트가 든 파일을 고쳤으면 거부한다(ADR 0017)
+          # 패치 전에 돌던 테스트가 꺼졌거나 패치 전에 실패한 테스트가 든 파일을 고쳤으면 거부한다(ADR 0017).
+          # 패치 전 기록은 기록 스텝이 보고서에 넘긴 디렉터리에서 읽는다. 잡 단위 env에서는 runner 컨텍스트를 쓸 수 없어 경로를
+          # 두 스텝에 적고, 둘이 같은지는 ci-fix-guard의 workflow.test.ts가 잠근다.
+          # 출처(GitHub 문서의 Context availability, 확인 2026-11-21):
+          # https://raw.githubusercontent.com/github/docs/main/content/actions/reference/workflows-and-actions/contexts.md
           if why="$(node "$RUNNER_TEMP/ci-fix-guard/src/cli.ts" "$RUNNER_TEMP/ledger-before" "$CI_FIX_GUARD_LEDGER" "$RUNNER_TEMP/ci-fix/fix.patch")"; then
             echo "result=pass" >> "$GITHUB_OUTPUT"
           else
