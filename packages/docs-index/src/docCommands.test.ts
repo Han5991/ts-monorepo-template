@@ -16,17 +16,15 @@ describe('저장소의 문서·주석에 적은 명령', () => {
     const files = trackedFiles(REPO_ROOT, '.');
     const sources = docSources(REPO_ROOT, files, [SELF]);
     expect(sources.length).toBeGreaterThan(0);
-    expect(commandProblems(sources, readWorkspaces(REPO_ROOT, files))).toEqual(
-      [],
-    );
+    expect(commandProblems(sources, readWorkspaces(REPO_ROOT))).toEqual([]);
   });
 });
 
 const WORKSPACES: Workspaces = {
-  root: { name: undefined, scripts: ['lint', 'docs:index'], tools: ['turbo'] },
+  root: { name: undefined, scripts: ['lint', 'docs:index'], bins: ['turbo'] },
   packages: [
-    { name: '@x/docs', scripts: ['generate', 'lint', 'test'], tools: [] },
-    { name: '@x/api', scripts: ['lint', 'dev'], tools: ['vitest'] },
+    { name: '@x/docs', scripts: ['generate', 'lint', 'test'], bins: [] },
+    { name: '@x/api', scripts: ['lint', 'dev'], bins: ['vitest'] },
   ],
 };
 
@@ -41,6 +39,9 @@ describe('commandProblem', () => {
     'pnpm --filter=@x/api dev',
     'pnpm --filter @x/api vitest run',
     'pnpm turbo run lint test --filter=@x/api',
+    // 띄어 쓴 옵션 값은 작업이 아니다
+    'pnpm turbo run lint --filter @x/api',
+    'pnpm turbo run lint test --concurrency 1',
   ])('%s — 돈다', command => {
     expect(commandProblem(command, WORKSPACES)).toBeUndefined();
   });
@@ -64,11 +65,51 @@ describe('commandProblem', () => {
       'pnpm turbo run lint check-types build',
       '어느 패키지에도 없는 작업이다: check-types, build',
     ],
+    // 옵션 앞의 작업은 그대로 본다 — 옵션 값(@x/api)은 작업으로 알리지 않는다
+    [
+      'pnpm turbo run lint check-types --filter @x/api',
+      '어느 패키지에도 없는 작업이다: check-types',
+    ],
+    // 옵션 뒤의 낱말은 값인지 작업인지 가리지 못한다 — 옵션 앞에 작업이 없으면 보지 못한 채 통과시키지 않는다
+    [
+      'pnpm turbo run --filter=@x/api lint',
+      'turbo run 바로 뒤에 작업 이름이 없다(작업은 옵션 앞에 적는다)',
+    ],
+    [
+      'pnpm turbo run',
+      'turbo run 바로 뒤에 작업 이름이 없다(작업은 옵션 앞에 적는다)',
+    ],
     ['pnpm -r test', '이 검사가 모르는 옵션이다: -r'],
     ['pnpm --filter @x/docs', '실행할 것이 없다'],
   ])('%s — %s', (command, problem) => {
     expect(commandProblem(command, WORKSPACES)).toBe(problem);
   });
+});
+
+describe('commandProblem — name 필드가 없는 package.json이 있는 워크스페이스', () => {
+  const WITH_NAMELESS: Workspaces = {
+    ...WORKSPACES,
+    packages: [
+      ...WORKSPACES.packages,
+      { name: undefined, scripts: ['test'], bins: [] },
+    ],
+  };
+
+  it('이름을 적은 --filter는 그 이름의 패키지에서만 본다', () => {
+    expect(
+      commandProblem('pnpm --filter @x/docs test', WITH_NAMELESS),
+    ).toBeUndefined();
+    expect(commandProblem('pnpm --filter @x/api test', WITH_NAMELESS)).toBe(
+      '@x/api의 package.json에 없는 스크립트다: test',
+    );
+  });
+
+  it.each(['pnpm --filter', 'pnpm --filter=', 'pnpm --filter= test'])(
+    '%s — 이름이 없으면 name 없는 package.json과 맞추지 않고 거부한다',
+    command => {
+      expect(commandProblem(command, WITH_NAMELESS)).toBe('패키지 이름이 없다');
+    },
+  );
 });
 
 describe('pnpmCommandsIn', () => {

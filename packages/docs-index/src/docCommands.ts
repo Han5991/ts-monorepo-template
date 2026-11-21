@@ -1,8 +1,9 @@
 /**
  * 문서·주석에 백틱으로 적은 pnpm 명령이 실제로 도는지 본다 — 스크립트 이름을 바꾸거나 지워도 안내하는 글이 조용히 낡지 않게.
  * 보는 글: `.md`는 전부, 그 밖의 파일은 주석 줄만(문자열 데이터에 든 명령은 안내가 아니다).
- * 보는 것: 첫 낱말이 pnpm 자체 명령이거나, package.json의 스크립트이거나, 설치한 도구인가. `--filter`가 있으면 그 패키지에서 본다.
- * `turbo run` 뒤의 작업 이름은 어느 워크스페이스 패키지엔가 있는 스크립트여야 한다. 그 밖의 인자는 보지 않는다.
+ * 보는 것: 첫 낱말이 pnpm 자체 명령이거나, package.json의 스크립트이거나, 설치한 도구의 실행 이름인가. `--filter`가 있으면 그 패키지에서
+ * 본다. `turbo run` 뒤 첫 옵션 앞의 낱말이 작업 이름이고, 어느 워크스페이스 패키지엔가 있는 스크립트여야 한다. 옵션 뒤의 낱말은
+ * 옵션 값(`--filter @x/api`)인지 작업인지 가리지 못해 보지 않는다 — 작업을 옵션 뒤에만 적으면 거부한다. 그 밖의 인자는 보지 않는다.
  */
 import type { SourceText } from '#/docPaths.ts';
 
@@ -11,8 +12,11 @@ export interface Workspace {
   /** package.json의 name — 루트는 없어도 된다 */
   readonly name: string | undefined;
   readonly scripts: readonly string[];
-  /** 설치한 도구(dependencies·devDependencies의 이름) — `pnpm turbo`처럼 이름으로 부른다 */
-  readonly tools: readonly string[];
+  /**
+   * 설치한 도구의 실행 이름(그 패키지의 `node_modules/.bin`) — 패키지 이름이 아니다. typescript를 깔면 pnpm tsc는 돌고
+   * pnpm typescript는 "Command not found"다(pnpm 12.18.0으로 실행해 확인, 2026-11-21).
+   */
+  readonly bins: readonly string[];
 }
 
 export interface Workspaces {
@@ -65,12 +69,14 @@ export function commandProblem(
   if (first === '--filter' || first.startsWith('--filter=')) {
     const name =
       first === '--filter' ? words[1] : first.slice('--filter='.length);
+    // 이름 없이 찾으면 name 필드가 없는 package.json과 맞는다
+    if (name === undefined || name === '') return '패키지 이름이 없다';
     const found = workspaces.packages.find(pkg => pkg.name === name);
     if (found === undefined) {
-      return `워크스페이스에 없는 패키지다: ${name ?? '(이름 없음)'}`;
+      return `워크스페이스에 없는 패키지다: ${name}`;
     }
     target = found;
-    where = `${found.name ?? ''}의 package.json`;
+    where = `${name}의 package.json`;
     words.splice(0, first === '--filter' ? 2 : 1);
   } else if (first.startsWith('-')) {
     return `이 검사가 모르는 옵션이다: ${first}`;
@@ -82,10 +88,16 @@ export function commandProblem(
   if (head === undefined) return '실행할 것이 없다';
   if (target.scripts.includes(head)) return undefined;
   const known =
-    !viaRun && (PNPM_COMMANDS.includes(head) || target.tools.includes(head));
+    !viaRun && (PNPM_COMMANDS.includes(head) || target.bins.includes(head));
   if (!known) return `${where}에 없는 스크립트다: ${head}`;
   if (head === 'turbo' && rest[0] === 'run') {
-    const tasks = rest.slice(1).filter(word => !word.startsWith('-'));
+    // 첫 옵션 앞까지가 작업이다 — 띄어 쓴 옵션 값(`--concurrency 1`)을 작업으로 세지 않는다
+    const args = rest.slice(1);
+    const firstOption = args.findIndex(word => word.startsWith('-'));
+    const tasks = firstOption === -1 ? args : args.slice(0, firstOption);
+    if (tasks.length === 0) {
+      return 'turbo run 바로 뒤에 작업 이름이 없다(작업은 옵션 앞에 적는다)';
+    }
     const missing = tasks.filter(
       task => !workspaces.packages.some(pkg => pkg.scripts.includes(task)),
     );
