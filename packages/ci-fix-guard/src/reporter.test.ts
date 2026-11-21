@@ -85,8 +85,8 @@ let reporter = '';
 let cli = '';
 
 /**
- * 안쪽 실행을 돌리고 종료 코드와 출력을 돌려준다. 시간 제한에 걸렸거나 신호로 끝났으면 throw한다 — 그 경우를 종료 코드로 바꾸면
- * "실행이 실패해야 한다"는 단언이 끝나지 않은 실행으로 거짓 통과한다.
+ * 안쪽 실행을 돌리고 종료 코드와 출력을 돌려준다. 띄우지 못했거나, 시간 제한에 걸렸거나, 신호로 끝났으면 throw한다 — 그 경우를
+ * 종료 코드로 바꾸면 "실행이 실패해야 한다"는 단언이 끝나지 않은 실행으로 거짓 통과한다.
  */
 function runChild(
   args: readonly string[],
@@ -101,8 +101,12 @@ function runChild(
   });
   if (result.error !== undefined || result.status === null) {
     const why = result.signal ?? result.error?.message ?? '알 수 없음';
+    // 띄우지도 못했으면(ENOENT 등) 출력이 없다 — @types/node는 stderr를 string으로 적으니 unknown으로 받아 확인한다.
+    // 출처(확인 2026-11-21): https://github.com/nodejs/node/blob/v26.13.0/lib/internal/child_process.js#L1171-L1172
+    const stderr: unknown = result.stderr;
+    const tail = typeof stderr === 'string' ? `\n${stderr.slice(-2000)}` : '';
     throw new Error(
-      `안쪽 실행이 끝나지 않았다(${why}): ${args.join(' ')}\n${result.stderr.slice(-2000)}`,
+      `안쪽 실행이 제대로 끝나지 않았다(${why}): ${args.join(' ')}${tail}`,
     );
   }
   return { status: result.status, stdout: result.stdout };
