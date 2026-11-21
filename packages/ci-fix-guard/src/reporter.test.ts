@@ -71,15 +71,42 @@ const FILES = {
 const FAILING_FILES = ['broken.test.ts', 'hook.test.ts'] as const;
 
 /**
- * 안쪽 Vitest를 띄우는 훅·테스트의 시간 제한. CI 러너에서는 한 번 띄우는 데 2~4초, 두 번 띄우면 6초 넘게 걸렸다(다른 패키지의
- * 테스트와 함께 돌아 더 느리다). Vitest 기본값(테스트 5초·훅 10초)으로는 모자라 시간 초과로 실패했다 — 멈춘 것은 이 안에 드러난다.
+ * 안쪽 실행(Vitest·CLI) 한 번의 시간 제한. CI 러너에서 Vitest를 한 번 띄우는 데 2~4초 걸렸다(다른 패키지의 테스트와 함께 돌면
+ * 더 느리다). spawnSync는 끝날 때까지 이벤트 루프를 막으므로 Vitest의 테스트 시간 제한은 그동안 돌지 못한다 — 멈춘 안쪽 실행은
+ * 이 제한으로 끊고 예외로 알린다.
  */
-const CHILD_RUN_TIMEOUT = 60_000;
+const CHILD_RUN_TIMEOUT = 30_000;
+/** 안쪽 실행을 두 번까지 하는 훅·테스트의 시간 제한. Vitest 기본값(테스트 5초·훅 10초)으로는 모자라 시간 초과로 실패했다 */
+const TEST_TIMEOUT = 2 * CHILD_RUN_TIMEOUT + 10_000;
 
 let work = '';
 let project = '';
 let reporter = '';
 let cli = '';
+
+/**
+ * 안쪽 실행을 돌리고 종료 코드와 출력을 돌려준다. 시간 제한에 걸렸거나 신호로 끝났으면 throw한다 — 그 경우를 종료 코드로 바꾸면
+ * "실행이 실패해야 한다"는 단언이 끝나지 않은 실행으로 거짓 통과한다.
+ */
+function runChild(
+  args: readonly string[],
+  env: NodeJS.ProcessEnv,
+): { status: number; stdout: string } {
+  const result = spawnSync(process.execPath, args, {
+    cwd: project,
+    encoding: 'utf8',
+    env,
+    timeout: CHILD_RUN_TIMEOUT,
+    killSignal: 'SIGKILL',
+  });
+  if (result.error !== undefined || result.status === null) {
+    const why = result.signal ?? result.error?.message ?? '알 수 없음';
+    throw new Error(
+      `안쪽 실행이 끝나지 않았다(${why}): ${args.join(' ')}\n${result.stderr.slice(-2000)}`,
+    );
+  }
+  return { status: result.status, stdout: result.stdout };
+}
 
 /** 픽스처 프로젝트에서 Vitest를 돌린다(전역 API로 — 픽스처에는 node_modules가 없다). 종료 코드를 돌려준다 */
 function runVitest(ledgerDir: string | undefined): number {
@@ -90,8 +117,7 @@ function runVitest(ledgerDir: string | undefined): number {
       ([key]) => !key.startsWith('VITEST') && key !== LEDGER_DIR_ENV,
     ),
   );
-  const result = spawnSync(
-    process.execPath,
+  return runChild(
     [
       VITEST_BIN,
       'run',
@@ -101,14 +127,8 @@ function runVitest(ledgerDir: string | undefined): number {
       '--reporter=default',
       `--reporter=${reporter}`,
     ],
-    {
-      cwd: project,
-      encoding: 'utf8',
-      env:
-        ledgerDir === undefined ? env : { ...env, [LEDGER_DIR_ENV]: ledgerDir },
-    },
-  );
-  return result.status ?? -1;
+    ledgerDir === undefined ? env : { ...env, [LEDGER_DIR_ENV]: ledgerDir },
+  ).status;
 }
 
 function readLedger(dir: string): Ledger {
@@ -127,11 +147,7 @@ function runCli(before: string, after: string, patchedFiles: string[]) {
     patch,
     patchedFiles.map(file => `diff --git a/${file} b/${file}\n`).join(''),
   );
-  const result = spawnSync(process.execPath, [cli, before, after, patch], {
-    cwd: project,
-    encoding: 'utf8',
-  });
-  return { status: result.status, stdout: result.stdout };
+  return runChild([cli, before, after, patch], process.env);
 }
 
 beforeAll(() => {
@@ -152,13 +168,13 @@ beforeAll(() => {
     writeFileSync(path.join(project, name), text);
   }
   runVitest(path.join(work, 'before'));
-}, CHILD_RUN_TIMEOUT);
+}, TEST_TIMEOUT);
 
 afterAll(() => {
   rmSync(work, { recursive: true, force: true });
 });
 
-describe('보고서', { timeout: CHILD_RUN_TIMEOUT }, () => {
+describe('보고서', { timeout: TEST_TIMEOUT }, () => {
   it('테스트마다 모드·결과·실패 기대를 적는다', () => {
     const modes = readLedger(path.join(work, 'before')).modules.find(module =>
       module.file.endsWith('modes.test.ts'),
@@ -239,50 +255,44 @@ describe('기록 파일 이름', () => {
   });
 });
 
-describe(
-  'CLI(작업 트리 밖에 복사한 판)',
-  { timeout: CHILD_RUN_TIMEOUT },
-  () => {
-    it('코드를 고쳐 실패한 테스트를 통과시킨 패치는 통과한다', () => {
-      writeFileSync(path.join(project, 'sum.ts'), FIXED_SUM);
-      try {
-        runVitest(path.join(work, 'fixed'));
-        expect(
-          runCli(path.join(work, 'before'), path.join(work, 'fixed'), [
-            'sum.ts',
-          ]),
-        ).toEqual({
-          status: 0,
-          stdout:
-            '통과: 패치 전에 돌던 테스트가 모두 돌고, 실패한 테스트가 든 파일은 고치지 않았다\n',
-        });
-      } finally {
-        writeFileSync(path.join(project, 'sum.ts'), BUGGY_SUM);
-      }
-    });
+describe('CLI(작업 트리 밖에 복사한 판)', { timeout: TEST_TIMEOUT }, () => {
+  it('코드를 고쳐 실패한 테스트를 통과시킨 패치는 통과한다', () => {
+    writeFileSync(path.join(project, 'sum.ts'), FIXED_SUM);
+    try {
+      runVitest(path.join(work, 'fixed'));
+      expect(
+        runCli(path.join(work, 'before'), path.join(work, 'fixed'), ['sum.ts']),
+      ).toEqual({
+        status: 0,
+        stdout:
+          '통과: 패치 전에 돌던 테스트가 모두 돌고, 실패한 테스트가 든 파일은 고치지 않았다\n',
+      });
+    } finally {
+      writeFileSync(path.join(project, 'sum.ts'), BUGGY_SUM);
+    }
+  });
 
-    it('실패한 테스트를 꺼서 초록으로 만든 패치는 거부한다 — 문자열 검사가 못 보는 꼴(.call)도', () => {
-      writeFileSync(
-        path.join(project, 'sum.test.ts'),
-        SUM_TEST.replace(
-          "it('더한다', () => {",
-          "it('더한다', ctx => {\n    ctx.skip.call(ctx, true);",
-        ),
+  it('실패한 테스트를 꺼서 초록으로 만든 패치는 거부한다 — 문자열 검사가 못 보는 꼴(.call)도', () => {
+    writeFileSync(
+      path.join(project, 'sum.test.ts'),
+      SUM_TEST.replace(
+        "it('더한다', () => {",
+        "it('더한다', ctx => {\n    ctx.skip.call(ctx, true);",
+      ),
+    );
+    try {
+      runVitest(path.join(work, 'skipped'));
+      const { status, stdout } = runCli(
+        path.join(work, 'before'),
+        path.join(work, 'skipped'),
+        ['sum.test.ts'],
       );
-      try {
-        runVitest(path.join(work, 'skipped'));
-        const { status, stdout } = runCli(
-          path.join(work, 'before'),
-          path.join(work, 'skipped'),
-          ['sum.test.ts'],
-        );
-        expect(status).toBe(1);
-        expect(stdout).toBe(
-          '거부: sum.test.ts > sum > 더한다 — 실행 중에 건너뛴다(ctx.skip 등) 외 1건\n',
-        );
-      } finally {
-        writeFileSync(path.join(project, 'sum.test.ts'), SUM_TEST);
-      }
-    });
-  },
-);
+      expect(status).toBe(1);
+      expect(stdout).toBe(
+        '거부: sum.test.ts > sum > 더한다 — 실행 중에 건너뛴다(ctx.skip 등) 외 1건\n',
+      );
+    } finally {
+      writeFileSync(path.join(project, 'sum.test.ts'), SUM_TEST);
+    }
+  });
+});
