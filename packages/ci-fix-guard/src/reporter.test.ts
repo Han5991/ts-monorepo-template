@@ -66,9 +66,12 @@ let cli = '';
 
 /** 픽스처 프로젝트에서 Vitest를 돌린다(전역 API로 — 픽스처에는 node_modules가 없다). 종료 코드를 돌려준다 */
 function runVitest(ledgerDir: string | undefined): number {
-  // 바깥 Vitest의 작업자 환경 변수가 안쪽 실행에 섞이지 않게 뺀다
+  // 바깥 Vitest의 작업자 환경 변수가 안쪽 실행에 섞이지 않게 뺀다. 기록할 곳도 뺀다 — verify가 이 테스트를 돌릴 때는
+  // 바깥에서 기록할 곳을 받는데, 그대로 물려주면 픽스처의 기록이 verify의 기록 디렉터리에 섞인다
   const env = Object.fromEntries(
-    Object.entries(process.env).filter(([key]) => !key.startsWith('VITEST')),
+    Object.entries(process.env).filter(
+      ([key]) => !key.startsWith('VITEST') && key !== LEDGER_DIR_ENV,
+    ),
   );
   const result = spawnSync(
     process.execPath,
