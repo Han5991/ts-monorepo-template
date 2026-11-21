@@ -9,6 +9,7 @@ const TEST = {
 };
 const MODULE = {
   file: '/repo/packages/a/src/x.test.ts',
+  state: 'passed',
   errors: 0,
   tests: [TEST],
 };
@@ -44,6 +45,7 @@ describe('parseLedger', () => {
     ],
     ['이름이 비었다', withTest({ name: '' }), 'tests[0].name'],
     ['파일 오류 수가 음수다', withModule({ errors: -1 }), 'modules[0].errors'],
+    ['모르는 파일 결과', withModule({ state: 'weird' }), 'modules[0].state'],
     ['modules가 배열이 아니다', { ...LEDGER, modules: {} }, 'a.json: modules'],
     ['객체가 아니다', [], 'a.json: 기록'],
   ])('%s — 어디가 다른지 적어 거부한다', (_, raw, where) => {

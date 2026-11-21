@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type {
@@ -45,15 +46,22 @@ export default class LedgerReporter implements Reporter {
     };
     mkdirSync(dir, { recursive: true });
     writeFileSync(
-      path.join(dir, `${this.root.replace(/[^\w.-]+/g, '_')}.json`),
+      path.join(dir, ledgerFileName(this.root)),
       `${JSON.stringify(ledger)}\n`,
     );
   }
 }
 
+/** 패키지마다 파일 하나 — 읽기 쉬운 이름 뒤에 root의 해시를 붙여, 이름을 줄이다 겹친 두 패키지가 서로를 덮어쓰지 않게 한다 */
+export function ledgerFileName(root: string): string {
+  const hash = createHash('sha256').update(root).digest('hex').slice(0, 12);
+  return `${root.replace(/[^\w.-]+/g, '_')}-${hash}.json`;
+}
+
 function toModule(testModule: TestModule): LedgerModule {
   return {
     file: testModule.moduleId,
+    state: testModule.state(),
     errors: testModule.errors().length,
     tests: [...testModule.children.allTests()].map(test => ({
       name: test.fullName,

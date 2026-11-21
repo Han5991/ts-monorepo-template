@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseLedger, type Ledger } from '#/ledger.ts';
-import { LEDGER_DIR_ENV } from '#/reporter.ts';
+import { LEDGER_DIR_ENV, ledgerFileName } from '#/reporter.ts';
 
 // 실제 Vitest로 보고서와 CLI를 돌린다 — Vitest를 올려 보고서 API가 바뀌면 verify에서 조용히 틀리기 전에 여기서 실패한다.
 // verify 잡처럼 이 패키지(package.json과 src)를 node_modules 없는 곳에 복사해 그 판을 쓴다.
@@ -57,7 +57,18 @@ const FILES = {
     '',
   ].join('\n'),
   'broken.test.ts': "import './없는-파일.ts';\nit('돌지 못한다', () => {});\n",
+  'hook.test.ts': [
+    "describe('준비', () => {",
+    '  beforeAll(() => {',
+    "    throw new Error('준비 실패');",
+    '  });',
+    "  it('준비가 필요한 테스트', () => {});",
+    '});',
+    '',
+  ].join('\n'),
 };
+/** 실패하는 파일들 — 이것들을 빼고 덧셈을 고치면 모든 테스트가 통과한다 */
+const FAILING_FILES = ['broken.test.ts', 'hook.test.ts'] as const;
 
 let work = '';
 let project = '';
@@ -166,31 +177,59 @@ describe('보고서', () => {
     ]);
   });
 
-  it('실패한 테스트와 불러오지 못한 파일, 실행 결과를 적는다', () => {
+  it('실패한 테스트·불러오지 못한 파일·훅이 실패한 파일과 실행 결과를 적는다', () => {
     const ledger = readLedger(path.join(work, 'before'));
     const byName = (name: string) =>
       ledger.modules.find(module => module.file.endsWith(name));
     expect(ledger.reason).toBe('failed');
     expect(ledger.root).toBe(project);
-    expect(byName('sum.test.ts')?.tests).toEqual([
-      { name: 'sum > 더한다', mode: 'run', fails: false, state: 'failed' },
-    ]);
-    expect(byName('broken.test.ts')).toMatchObject({ tests: [] });
+    expect(byName('sum.test.ts')).toMatchObject({
+      state: 'failed',
+      tests: [
+        { name: 'sum > 더한다', mode: 'run', fails: false, state: 'failed' },
+      ],
+    });
+    expect(byName('broken.test.ts')).toMatchObject({
+      state: 'failed',
+      tests: [],
+    });
     expect(byName('broken.test.ts')?.errors).toBeGreaterThan(0);
+    // 훅이 실패하면 테스트는 skipped로만, 파일 오류 수는 0으로 남는다 — 실패한 파일인지는 파일의 결과로만 알 수 있다
+    expect(byName('hook.test.ts')).toEqual({
+      file: path.join(project, 'hook.test.ts'),
+      state: 'failed',
+      errors: 0,
+      tests: [
+        {
+          name: '준비 > 준비가 필요한 테스트',
+          mode: 'run',
+          fails: false,
+          state: 'skipped',
+        },
+      ],
+    });
   });
 
-  it('기록할 곳을 받지 못하면 실행이 실패한다', () => {
+  it('기록할 곳을 받지 못하면 실행이 실패한다 — 양성 대조: 받으면 같은 실행이 통과한다', () => {
     writeFileSync(path.join(project, 'sum.ts'), FIXED_SUM);
-    rmSync(path.join(project, 'broken.test.ts'));
+    for (const name of FAILING_FILES) rmSync(path.join(project, name));
     try {
+      expect(runVitest(path.join(work, 'passing'))).toBe(0);
       expect(runVitest(undefined)).not.toBe(0);
     } finally {
       writeFileSync(path.join(project, 'sum.ts'), BUGGY_SUM);
-      writeFileSync(
-        path.join(project, 'broken.test.ts'),
-        FILES['broken.test.ts'],
-      );
+      for (const name of FAILING_FILES) {
+        writeFileSync(path.join(project, name), FILES[name]);
+      }
     }
+  });
+});
+
+describe('기록 파일 이름', () => {
+  it('이름을 줄이다 겹치는 두 패키지도 다른 파일에 쓴다 — 한쪽이 다른 쪽을 덮어쓰지 않게', () => {
+    expect(ledgerFileName('/w/a b')).not.toBe(ledgerFileName('/w/a_b'));
+    expect(ledgerFileName('/w/a/b_c')).not.toBe(ledgerFileName('/w/a_b/c'));
+    expect(ledgerFileName('/w/a b')).toMatch(/^_w_a_b-[0-9a-f]{12}\.json$/);
   });
 });
 

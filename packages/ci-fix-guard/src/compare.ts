@@ -8,8 +8,9 @@ import type { Ledger, LedgerTest } from '#/ledger.ts';
  * - 패치 전에 실제로 돌던 테스트는 패치 뒤에도 실제로 돌아야 한다. 테스트를 끄는 문법(skip·todo·fails·only·실행 중 건너뛰기,
  *   별칭·상수·다른 파일의 옵션)과 상관없이 결과로 본다. 지우거나 이름을 바꿔도 사라진 것으로 본다. 패치 전에 이미 돌지 않던
  *   테스트는 보지 않는다.
- * - 패치 전에 실패한 테스트가 든 파일은 패치가 고치지 못한다 — 테스트를 실패에 맞추지 말고 테스트가 검사하는 코드를 고친다.
- *   불러오기부터 실패한 파일(테스트가 하나도 없는 파일)은 여기에 들지 않는다(import 경로를 고칠 수 있게).
+ * - 패치 전에 실패한 테스트 파일(테스트나 훅이 실패한 파일)은 패치가 고치지 못한다. 그 파일의 스냅샷(__snapshots__/<파일>.snap)도
+ *   같다 — 테스트를 실패에 맞추지 말고 테스트가 검사하는 코드를 고친다. 불러오기부터 실패한 파일(테스트가 하나도 수집되지 않은
+ *   파일)은 여기에 들지 않는다(import 경로를 고칠 수 있게).
  * 경로는 repoRoot 기준 상대 경로로 맞춘다(패치의 경로가 저장소 루트 기준이다).
  */
 export function compareLedgers({
@@ -101,15 +102,26 @@ export function compareLedgers({
     );
   }
 
+  // 훅이 실패한 묶음의 테스트는 결과가 skipped로만 남는다 — 테스트 하나하나가 아니라 파일의 결과로 본다
   const failedFiles = new Set(
-    tests(before)
-      .filter(({ test }) => test.state === 'failed')
-      .map(({ file }) => relative(file)),
+    before
+      .flatMap(ledger => ledger.modules)
+      .filter(
+        module =>
+          module.tests.length > 0 &&
+          (module.state === 'failed' ||
+            module.tests.some(test => test.state === 'failed')),
+      )
+      .map(module => relative(module.file)),
   );
   for (const file of changedFiles) {
     if (failedFiles.has(file)) {
       problems.push(
         `${file} — 패치 전에 실패한 테스트가 든 파일을 고쳤다. 테스트가 아니라 테스트가 검사하는 코드를 고친다`,
+      );
+    } else if (failedFiles.has(snapshotOwner(file))) {
+      problems.push(
+        `${file} — 패치 전에 실패한 테스트의 스냅샷을 고쳤다. 기대값을 실패에 맞추지 말고 코드를 고친다`,
       );
     }
   }
@@ -128,6 +140,12 @@ export function changedFiles(patch: string): string[] {
     files.push(match[1]);
   }
   return files;
+}
+
+/** 스냅샷 파일의 주인인 테스트 파일(Vitest 기본 위치: <디렉터리>/__snapshots__/<테스트 파일>.snap). 스냅샷이 아니면 빈 문자열 */
+function snapshotOwner(file: string): string {
+  const match = /^(.*?)__snapshots__\/([^/]+)\.snap$/.exec(file);
+  return match ? `${match[1] ?? ''}${match[2] ?? ''}` : '';
 }
 
 /** 실제로 도는 테스트 — 모드가 run·only이고, 실패를 기대하지 않고, 결과가 건너뜀·보류가 아니다 */

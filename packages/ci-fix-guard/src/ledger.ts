@@ -14,6 +14,16 @@ export type TestMode = (typeof TEST_MODES)[number];
 export const TEST_STATES = ['passed', 'failed', 'skipped', 'pending'] as const;
 export type TestState = (typeof TEST_STATES)[number];
 
+/** 테스트 파일의 결과. 테스트가 실패해도, 훅(beforeAll 등)이 실패해도, 불러오지 못해도 failed다 */
+export const MODULE_STATES = [
+  'passed',
+  'failed',
+  'skipped',
+  'pending',
+  'queued',
+] as const;
+export type ModuleState = (typeof MODULE_STATES)[number];
+
 /** 실행이 어떻게 끝났나 — interrupted면 기록이 모자란다 */
 export const RUN_END_REASONS = ['passed', 'failed', 'interrupted'] as const;
 export type RunEndReason = (typeof RUN_END_REASONS)[number];
@@ -30,7 +40,11 @@ export interface LedgerTest {
 export interface LedgerModule {
   /** 테스트 파일의 절대 경로 */
   readonly file: string;
-  /** 파일 단위 오류 수(불러오기 실패·훅 오류). 불러오지 못한 파일은 tests가 비어 있다 */
+  /**
+   * 파일의 결과. 훅이 실패한 묶음의 테스트는 결과가 skipped로만 남으므로(파일 오류 수도 0이다), 실패한 파일인지는 이것으로 본다
+   */
+  readonly state: ModuleState;
+  /** 파일 단위 오류 수(불러오기 실패 등 — 묶음의 훅 오류는 세지 않는다). 불러오지 못한 파일은 tests가 비어 있다 */
   readonly errors: number;
   readonly tests: readonly LedgerTest[];
 }
@@ -69,6 +83,7 @@ function parseModule(raw: unknown, where: string): LedgerModule {
   }
   return {
     file: text(module.get('file'), `${where}.file`),
+    state: oneOf(module.get('state'), MODULE_STATES, `${where}.state`),
     errors,
     tests: list(module.get('tests'), `${where}.tests`).map((item, i) =>
       parseTest(item, `${where}.tests[${String(i)}]`),

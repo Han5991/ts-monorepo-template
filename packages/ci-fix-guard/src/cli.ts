@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { changedFiles, compareLedgers } from '#/compare.ts';
 import { parseLedger, type Ledger } from '#/ledger.ts';
@@ -39,7 +39,8 @@ try {
     before: readLedgers(beforeDir),
     after: readLedgers(afterDir),
     changedFiles: changedFiles(readFileSync(patchFile, 'utf8')),
-    repoRoot: process.cwd(),
+    // 기록의 파일 경로는 심볼릭 링크를 푼 실제 경로다 — 기준도 실제 경로로 맞춰야 상대 경로가 패치의 경로와 같아진다
+    repoRoot: realpathSync(process.cwd()),
   });
 } catch (error) {
   const reason = error instanceof Error ? error.message : String(error);

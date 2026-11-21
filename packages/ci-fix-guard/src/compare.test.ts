@@ -18,7 +18,13 @@ const test = (name: string, patch: Partial<LedgerTest> = {}): LedgerTest => ({
 const module = (
   tests: LedgerTest[],
   patch: Partial<LedgerModule> = {},
-): LedgerModule => ({ file: FILE, errors: 0, tests, ...patch });
+): LedgerModule => ({
+  file: FILE,
+  state: 'passed',
+  errors: 0,
+  tests,
+  ...patch,
+});
 const ledger = (
   modules: LedgerModule[],
   patch: Partial<Ledger> = {},
@@ -37,7 +43,11 @@ const compare = (
 
 const BEFORE = [
   ledger(
-    [module([test('sum > 더한다', { state: 'failed' }), test('sum > 0')])],
+    [
+      module([test('sum > 더한다', { state: 'failed' }), test('sum > 0')], {
+        state: 'failed',
+      }),
+    ],
     {
       reason: 'failed',
     },
@@ -161,13 +171,47 @@ describe('compareLedgers — 패치 전에 실패한 테스트가 든 파일은 
     ]);
   });
 
+  it('훅이 실패한 파일도 막힌다 — 그 묶음의 테스트는 결과가 skipped로만 남는다', () => {
+    const before = [
+      ledger([
+        module([test('sum > 준비가 필요하다', { state: 'skipped' })], {
+          state: 'failed',
+        }),
+      ]),
+    ];
+    expect(
+      compare(
+        before,
+        [ledger([module([test('sum > 준비가 필요하다')])])],
+        [TEST_FILE],
+      ),
+    ).toEqual([
+      `${TEST_FILE} — 패치 전에 실패한 테스트가 든 파일을 고쳤다. 테스트가 아니라 테스트가 검사하는 코드를 고친다`,
+    ]);
+  });
+
+  it('실패한 테스트의 스냅샷도 막힌다 — 통과하던 테스트의 스냅샷은 고쳐도 된다', () => {
+    expect(
+      compare(
+        BEFORE,
+        [ledger([module([test('sum > 더한다'), test('sum > 0')])])],
+        [
+          'packages/a/src/__snapshots__/sum.test.ts.snap',
+          'packages/a/src/__snapshots__/other.test.ts.snap',
+        ],
+      ),
+    ).toEqual([
+      'packages/a/src/__snapshots__/sum.test.ts.snap — 패치 전에 실패한 테스트의 스냅샷을 고쳤다. 기대값을 실패에 맞추지 말고 코드를 고친다',
+    ]);
+  });
+
   it('통과하던 테스트만 든 파일, 불러오기부터 실패한 파일은 고쳐도 된다', () => {
     const other = '/repo/packages/a/src/other.test.ts';
     const broken = '/repo/packages/a/src/broken.test.ts';
     const before = [
       ledger([
         module([test('other > 통과')], { file: other }),
-        module([], { file: broken, errors: 1 }),
+        module([], { file: broken, errors: 1, state: 'failed' }),
       ]),
     ];
     const after = [
