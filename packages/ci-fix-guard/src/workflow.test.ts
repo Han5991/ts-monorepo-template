@@ -11,6 +11,18 @@ const WORKFLOW = path.resolve(
   '../../.github/workflows/claude-ci-fix.yml',
 );
 
+/**
+ * RUNNER_TEMP 아래 기록 디렉터리를 실행할 때처럼 RUNNER_TEMP 뒤에 이어 붙여 푼다(끝의 `/`, 사이의 `./`·`//`). 글자가 달라도 같은
+ * 디렉터리면 같은 값이 된다. `..`는 받지 않고 throw한다 — 풀이에 쓰는 가짜 RUNNER_TEMP는 실제와 깊이가 달라서, 그 위로 오르내리는
+ * 경로는 서로 다른 디렉터리가 같게 풀린다(기록 디렉터리에 `..`를 쓸 까닭도 없다)
+ */
+function underRunnerTemp(dir: string): string {
+  if (dir.split('/').includes('..')) {
+    throw new Error(`기록 디렉터리에 ..를 쓰지 않는다: ${dir}`);
+  }
+  return path.posix.resolve(`/runner-temp/${dir}`);
+}
+
 describe('verify 잡이 적은 이름과 경로', () => {
   const text = readFileSync(WORKFLOW, 'utf8');
   /** 이름으로 찾은 스텝 하나 — 이름 줄부터 그 스텝의 줄(들여쓰기 8칸 이상)이 끝날 때까지. 없으면 throw한다 */
@@ -27,16 +39,13 @@ describe('verify 잡이 적은 이름과 경로', () => {
   const REPORTER_DIR = new RegExp(
     `${LEDGER_DIR_ENV}: \\$\\{\\{ runner\\.temp \\}\\}/(\\S+)`,
   );
-  /**
-   * 스텝에서 찾은 RUNNER_TEMP 아래 디렉터리. 실행할 때처럼 RUNNER_TEMP 뒤에 이어 붙여 푼다(끝의 `/`, 사이의 `./`·`//`·`..`) —
-   * 글자가 달라도 같은 디렉터리면 같은 값이 된다. 못 찾으면 throw한다
-   */
+  /** 스텝에서 정규식으로 찾은 기록 디렉터리를 푼 값(underRunnerTemp) — 못 찾으면 throw한다 */
   const runnerTempDir = (step: string, pattern: RegExp): string => {
     const dir = pattern.exec(step)?.[1];
     if (dir === undefined) {
       throw new Error(`스텝에서 ${String(pattern)}에 맞는 디렉터리가 없다`);
     }
-    return path.posix.resolve(`/runner-temp/${dir}`);
+    return underRunnerTemp(dir);
   };
 
   it('패치 전과 뒤에 보고서가 읽는 환경 변수로 기록할 곳을 넘긴다', () => {
@@ -89,6 +98,35 @@ describe('verify 잡이 적은 이름과 경로', () => {
     file => {
       expect(text).toContain(`ci-fix-guard/${file}`);
       expect(existsSync(path.join(PACKAGE_DIR, file))).toBe(true);
+    },
+  );
+});
+
+// 위 잠금은 두 디렉터리가 같은지를 이 풀이로 본다. 풀이가 글자 비교로 돌아가도 지금 워크플로 값으로는 위 테스트가 모두 통과한다
+// — 풀이 규칙을 고정 값으로 잠근다
+describe('기록 디렉터리 풀이', () => {
+  it.each([
+    ['ledger-before/', 'ledger-before'],
+    ['./ledger-before', 'ledger-before'],
+    ['ledger-before//', 'ledger-before'],
+    // `${{ runner.temp }}//ledger-before`에서 꺼낸 값
+    ['/ledger-before', 'ledger-before'],
+  ])('%s와 %s는 같은 디렉터리다', (a, b) => {
+    expect(underRunnerTemp(a)).toBe(underRunnerTemp(b));
+  });
+
+  it.each([
+    ['ledger-after', 'ledger-before'],
+    // 비교는 디렉터리 맨 위의 기록만 읽으니, 하위 디렉터리의 기록은 섞이지 않는다
+    ['ledger-before/after', 'ledger-before'],
+  ])('%s와 %s는 다른 디렉터리다', (a, b) => {
+    expect(underRunnerTemp(a)).not.toBe(underRunnerTemp(b));
+  });
+
+  it.each(['../ledger-before', 'x/../ledger-before', 'ledger-before/..'])(
+    '%s처럼 ..가 든 경로는 받지 않는다',
+    dir => {
+      expect(() => underRunnerTemp(dir)).toThrow('..를 쓰지 않는다');
     },
   );
 });
