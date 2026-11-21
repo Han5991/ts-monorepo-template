@@ -12,17 +12,20 @@ export class InMemoryTaskRepository implements TaskRepository {
     for (const task of initial) this.tasks.set(task.id, task);
   }
 
-  async list(filter: TaskFilter): Promise<Task[]> {
-    return [...this.tasks.values()]
-      .filter(t => filter.status === undefined || t.status === filter.status)
-      .sort((a, b) => a.id.localeCompare(b.id));
+  list(filter: TaskFilter): Promise<Task[]> {
+    return Promise.resolve(
+      [...this.tasks.values()]
+        .filter(t => filter.status === undefined || t.status === filter.status)
+        .sort((a, b) => a.id.localeCompare(b.id)),
+    );
   }
 
-  async get(id: string): Promise<Task | null> {
-    return this.tasks.get(id) ?? null;
+  get(id: string): Promise<Task | null> {
+    return Promise.resolve(this.tasks.get(id) ?? null);
   }
 
-  async save(task: Task): Promise<void> {
+  save(task: Task): Promise<void> {
     this.tasks.set(task.id, task);
+    return Promise.resolve();
   }
 }

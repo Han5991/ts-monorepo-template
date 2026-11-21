@@ -3,14 +3,14 @@ import { ApiError, createApiClient } from '#/client.ts';
 
 const respond =
   (status: number, body: unknown): typeof fetch =>
-  async () =>
-    new Response(JSON.stringify(body), { status });
+  () =>
+    Promise.resolve(new Response(JSON.stringify(body), { status }));
 
 const recording = () => {
   const urls: string[] = [];
-  const fetchImpl: typeof fetch = async input => {
-    urls.push(String(input));
-    return new Response(JSON.stringify({ ok: true }));
+  const fetchImpl: typeof fetch = input => {
+    urls.push(input instanceof Request ? input.url : String(input));
+    return Promise.resolve(new Response(JSON.stringify({ ok: true })));
   };
   return { urls, fetchImpl };
 };
@@ -62,7 +62,8 @@ describe('createApiClient', () => {
   it('계약 밖 에러 응답(프록시 오류 등)은 unexpected_response', async () => {
     const api = createApiClient({
       baseUrl: '',
-      fetch: async () => new Response('Bad Gateway', { status: 502 }),
+      fetch: () =>
+        Promise.resolve(new Response('Bad Gateway', { status: 502 })),
     });
     await expect(api.call('health')).rejects.toMatchObject({
       status: 502,
@@ -73,7 +74,7 @@ describe('createApiClient', () => {
   it('계약과 다른 성공 응답·JSON이 아닌 성공 응답(SPA HTML 등)도 unexpected_response', async () => {
     const fetches: (typeof fetch)[] = [
       respond(200, { ok: 'yes' }),
-      async () => new Response('<!doctype html>', { status: 200 }),
+      () => Promise.resolve(new Response('<!doctype html>', { status: 200 })),
     ];
     for (const fetchImpl of fetches) {
       const api = createApiClient({ baseUrl: '', fetch: fetchImpl });

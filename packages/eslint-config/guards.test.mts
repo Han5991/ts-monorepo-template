@@ -215,7 +215,8 @@ describe('도메인 모듈 폴더', () => {
       typeof config === 'object' && config !== null && 'settings' in config
         ? config.settings
         : undefined;
-    const elements =
+    // Array.isArray는 unknown을 any[]로 좁힌다 — 원소를 unknown으로 받아 아래에서 좁힌다
+    const elements: unknown[] =
       typeof settings === 'object' &&
       settings !== null &&
       'boundaries/elements' in settings &&
