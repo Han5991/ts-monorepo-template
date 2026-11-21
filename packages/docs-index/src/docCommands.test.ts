@@ -42,6 +42,12 @@ describe('commandProblem', () => {
     // 띄어 쓴 옵션 값은 작업이 아니다
     'pnpm turbo run lint --filter @x/api',
     'pnpm turbo run lint test --concurrency 1',
+    // turbo는 run 없이도 작업을 받는다 — 작업 이름은 run을 붙인 것과 똑같이 본다
+    'pnpm turbo lint test --filter @x/api',
+    // 옵션만 주면 turbo 자체를 부른 것이다
+    'pnpm turbo --version',
+    // 고른 패키지에서도 루트의 도구가 돈다 — pnpm이 루트의 .bin도 PATH에 붙인다
+    'pnpm --filter @x/docs turbo run lint',
   ])('%s — 돈다', command => {
     expect(commandProblem(command, WORKSPACES)).toBeUndefined();
   });
@@ -51,14 +57,15 @@ describe('commandProblem', () => {
     // `run`은 스크립트만 돌린다 — pnpm 자체 명령·도구 이름으로는 통과하지 않는다
     ['pnpm run install', '루트 package.json에 없는 스크립트다: install'],
     ['pnpm run turbo', '루트 package.json에 없는 스크립트다: turbo'],
-    // 루트에 있는 스크립트·도구라도 고른 패키지에 없으면 돌지 않는다
+    // 루트의 스크립트는 고른 패키지에서 돌지 않는다
     [
       'pnpm --filter @x/docs docs:index',
       '@x/docs의 package.json에 없는 스크립트다: docs:index',
     ],
+    // 다른 패키지에만 깐 도구도 돌지 않는다 — PATH에 붙는 것은 고른 패키지와 루트의 .bin뿐이다
     [
-      'pnpm --filter @x/docs turbo run lint',
-      '@x/docs의 package.json에 없는 스크립트다: turbo',
+      'pnpm --filter @x/docs vitest run',
+      '@x/docs의 package.json에 없는 스크립트다: vitest',
     ],
     ['pnpm --filter @x/none test', '워크스페이스에 없는 패키지다: @x/none'],
     [
@@ -79,6 +86,14 @@ describe('commandProblem', () => {
       'pnpm turbo run',
       'turbo run 바로 뒤에 작업 이름이 없다(작업은 옵션 앞에 적는다)',
     ],
+    // run 없이 적은 작업도 본다 — 오타는 turbo도 "Could not find task"로 실패한다
+    ['pnpm turbo lnit', '어느 패키지에도 없는 작업이다: lnit'],
+    [
+      'pnpm turbo --filter=@x/api lint',
+      'turbo 바로 뒤에 작업 이름이 없다(작업은 옵션 앞에 적는다)',
+    ],
+    // 루트의 스크립트는 turbo 작업이 아니다
+    ['pnpm turbo run docs:index', '어느 패키지에도 없는 작업이다: docs:index'],
     ['pnpm -r test', '이 검사가 모르는 옵션이다: -r'],
     ['pnpm --filter @x/docs', '실행할 것이 없다'],
   ])('%s — %s', (command, problem) => {
@@ -110,6 +125,25 @@ describe('commandProblem — name 필드가 없는 package.json이 있는 워크
       expect(commandProblem(command, WITH_NAMELESS)).toBe('패키지 이름이 없다');
     },
   );
+});
+
+describe('commandProblem — 루트도 --filter로 고른다', () => {
+  const NAMED_ROOT: Workspaces = {
+    ...WORKSPACES,
+    root: { ...WORKSPACES.root, name: 'x-root' },
+  };
+
+  it('루트의 name으로 고르면 루트의 스크립트를 본다', () => {
+    expect(
+      commandProblem('pnpm --filter x-root docs:index', NAMED_ROOT),
+    ).toBeUndefined();
+  });
+
+  it('루트를 골라도 패키지에만 있는 스크립트는 돌지 않는다', () => {
+    expect(commandProblem('pnpm --filter x-root generate', NAMED_ROOT)).toBe(
+      'x-root의 package.json에 없는 스크립트다: generate',
+    );
+  });
 });
 
 describe('pnpmCommandsIn', () => {
