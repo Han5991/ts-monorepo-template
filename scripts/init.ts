@@ -83,6 +83,8 @@ const MODULES = {
       '.github/scripts/claude-result-error.py',
       '.github/scripts/check-fix-patch.sh',
       '.github/scripts/check-fix-patch.test.sh',
+      'packages/ci-fix-guard',
+      'docs/adr/0017-ci-fix-checked-by-test-results.md',
       '.claude',
     ],
   },

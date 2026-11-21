@@ -1,0 +1,14 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    // 워크플로가 적은 이름·경로를 잠그는 테스트가 패키지 밖의 워크플로 파일을 읽는다. 입력으로 선언하지 않으면
+    // 그 파일만 바뀌었을 때 캐시가 맞아 어긋남을 놓친다.
+    "test": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/.github/workflows/claude-ci-fix.yml"
+      ]
+    }
+  }
+}
