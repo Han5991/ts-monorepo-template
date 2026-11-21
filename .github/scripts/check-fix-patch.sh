@@ -12,12 +12,16 @@
 #   - 새 파일·삭제·이름 바꾸기·모드 변경·심볼릭 링크(대상 바꾸기 포함)·바이너리
 #   - 테스트를 끄거나 뒤집는 것(skip·only·skipIf·runIf·todo·fails):
 #     - 수식어 — it·test·describe와 그 별칭 suite에. 이어 붙이거나(.concurrent.skip·.skip.each) 줄을 나눠 붙이거나,
-#       부르지 않고 참조만 해도(const s = it.skip), 대괄호로 꺼내도(it["only"])
+#       선택적 체이닝으로 붙이거나(it?.only), 부르지 않고 참조만 해도(const s = it.skip), 대괄호로 꺼내도(it["only"])
 #     - 실행 중에 건너뛰는 skip() 호출(ctx.skip()·ctx.skip?.()·구조 분해한 skip()). 다른 객체의 .skip() 호출도 보수적으로
 #     - 테스트 옵션 객체의 키({ skip: true }). 값이 숫자·문자열이면 통과한다 — 옵션 값으로는 타입 오류라 테스트를 끌 수 없고,
 #       예시 도메인의 { todo: 0 } 같은 상태별 값이 걸리지 않게
-#     정규식이라 다 막지는 못한다: test.extend로 만든 다른 이름(myTest.todo) 등. 허용 목록 안의 검사 도구 코드(docs-index·
-#     upgrade-gates의 src)를 느슨하게 고치거나 단언을 실패에 맞춰 바꾸는 것도 여기서는 못 본다 — 프롬프트 규칙과 리뷰가 본다
+#     - 수식어 이름의 변수 선언(const skip = …)과 단축 속성({ skip }) — 옵션 객체에 값을 넘기는 다른 꼴
+#     같은 이름의 식별자·타입도 보수적으로 거부한다(const todo = …, { todo }, todo: TaskStatus) — 예시 도메인의 todo 상태를
+#     건드리는 수정 일부가 자동으로 고쳐지지 않고 사람에게 간다
+#     이 검사는 흔한 꼴을 거르는 문자열 검사다 — 코드의 뜻을 보지 않으니 다 막지는 못한다. 못 보는 것: test.extend로 만든
+#     다른 이름(myTest.todo), 다른 파일에서 만든 옵션 객체를 넘기기, 허용 목록 안의 검사 도구 코드(docs-index·upgrade-gates의
+#     src)나 테스트 도우미(돌릴 대상 목록 등)를 느슨하게 고치기, 단언을 실패에 맞춰 바꾸기 — 프롬프트 규칙과 리뷰가 본다
 #   - 타입 검사를 끄는 주석(@ts-ignore·@ts-nocheck·@ts-expect-error — 설명을 붙여도)
 #   - 저장소에 적용되지 않는 패치
 #
@@ -53,11 +57,13 @@ done < <(sed -n 's#^diff --git a/\(.*\) b/.*$#\1#p' "$patch" | sort -u)
 # (`^\+[^+]`로 머리를 거르면 내용이 +로 시작하는 줄을 놓친다)
 added="$(awk '/^diff --git /{hunk=0; next} /^@@/{hunk=1; next} hunk && /^\+/' "$patch")"
 MODIFIERS='(skip|only|skipIf|runIf|todo|fails)'
-if grep -qE "\b(it|test|describe|suite)(\.[A-Za-z]+)*\.${MODIFIERS}\b" <<<"$added" ||
+if grep -qE "\b(it|test|describe|suite)(\??\.[A-Za-z]+)*\??\.${MODIFIERS}\b" <<<"$added" ||
   grep -qE "^\+\s*\.${MODIFIERS}\b" <<<"$added" ||
   grep -qE "\[\s*['\"\`]${MODIFIERS}['\"\`]\s*\]" <<<"$added" ||
   grep -qE '(^|[^A-Za-z0-9_$])skip\s*(\?\.\s*)?\(' <<<"$added" ||
-  grep -qE "\b(skip|only|todo|fails)\s*:(\s*\$|\s*[^0-9'\"\`[:space:]])" <<<"$added"; then
+  grep -qE "\b(skip|only|todo|fails)\s*:(\s*\$|\s*[^0-9'\"\`[:space:]])" <<<"$added" ||
+  grep -qE "\b(const|let|var)\s+${MODIFIERS}\b" <<<"$added" ||
+  grep -qE "([{,]|^\+)\s*${MODIFIERS}\s*([,}]|\$)" <<<"$added"; then
   reasons+=("테스트를 끄거나 뒤집는 수식어·호출·옵션(skip·only·skipIf·runIf·todo·fails)")
 fi
 grep -qE '@ts-(ignore|nocheck|expect-error)' <<<"$added" && reasons+=("@ts-ignore·@ts-nocheck·@ts-expect-error")
