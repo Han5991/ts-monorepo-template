@@ -20,6 +20,11 @@ describe('verify 잡이 적은 이름과 경로', () => {
     );
   });
 
+  // 의존 순서로 돌리면 테스트가 실패한 패키지에 기대는 패키지는 돌지 않아 패치 전 기록이 빠진다(비교가 그 패키지를 거부한다)
+  it('패치 전 테스트는 실패해도 모든 패키지를 의존 순서 없이 돌린다', () => {
+    expect(text).toContain('pnpm -r --no-bail --no-sort run test');
+  });
+
   it('기본 브랜치에서 이 패키지를 꺼내 온다', () => {
     expect(text).toMatch(/sparse-checkout: \|[^]*?packages\/ci-fix-guard\n/);
   });

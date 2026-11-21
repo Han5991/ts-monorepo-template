@@ -198,6 +198,23 @@ describe('compareLedgers — 기록을 믿을 수 없으면 통과시키지 않�
     ]);
   });
 
+  it('패치 전 기록이 빠진 패키지가 있으면 막힌다 — 그 패키지의 테스트를 지켰는지 볼 수 없다', () => {
+    const other = ledger(
+      [module([test('b > 통과')], { file: '/repo/packages/b/src/b.test.ts' })],
+      {
+        root: '/repo/packages/b',
+      },
+    );
+    expect(
+      compare(BEFORE, [
+        ledger([module([test('sum > 더한다'), test('sum > 0')])]),
+        other,
+      ]),
+    ).toEqual([
+      'packages/b: 패치 전 테스트 기록이 없다 — 이 패키지의 테스트를 지켰는지 볼 수 없다',
+    ]);
+  });
+
   it('실행이 중간에 끊긴 기록은 막힌다', () => {
     const after = [
       ledger([module([test('sum > 더한다'), test('sum > 0')])], {

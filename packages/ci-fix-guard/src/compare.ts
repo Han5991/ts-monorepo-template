@@ -3,8 +3,8 @@ import type { Ledger, LedgerTest } from '#/ledger.ts';
 
 /**
  * 패치 전과 뒤의 테스트 기록을 비교해 거부할 이유를 돌려준다(없으면 빈 배열). 규칙:
- * - 기록을 믿을 수 있어야 한다 — 패치 전 기록이 없거나, 실행이 중간에 끊겼거나, 패치 전에 기록이 있던 패키지의 기록이 패치 뒤에
- *   없으면 거부한다(비교하지 못한 채 통과시키지 않는다).
+ * - 기록을 믿을 수 있어야 한다 — 패치 전 기록이 없거나, 실행이 중간에 끊겼거나, 한쪽에만 기록이 있는 패키지가 있으면 거부한다
+ *   (비교하지 못한 채 통과시키지 않는다). 패치 전 기록이 빠진 패키지는 그 테스트를 지켰는지 볼 수 없다.
  * - 패치 전에 실제로 돌던 테스트는 패치 뒤에도 실제로 돌아야 한다. 테스트를 끄는 문법(skip·todo·fails·only·실행 중 건너뛰기,
  *   별칭·상수·다른 파일의 옵션)과 상관없이 결과로 본다. 지우거나 이름을 바꿔도 사라진 것으로 본다. 패치 전에 이미 돌지 않던
  *   테스트는 보지 않는다.
@@ -49,6 +49,14 @@ export function compareLedgers({
     problems.push(
       `${relative(root)}: 패치 뒤 테스트 기록이 없다(테스트가 돌지 않았다)`,
     );
+  }
+  const beforeRoots = new Set(before.map(ledger => ledger.root));
+  for (const ledger of after) {
+    if (!beforeRoots.has(ledger.root)) {
+      problems.push(
+        `${relative(ledger.root)}: 패치 전 테스트 기록이 없다 — 이 패키지의 테스트를 지켰는지 볼 수 없다`,
+      );
+    }
   }
 
   // 기록이 통째로 없는 패키지는 위에서 한 줄로 알렸다 — 그 안의 테스트를 하나씩 다시 적지 않는다
