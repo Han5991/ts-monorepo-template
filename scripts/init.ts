@@ -107,8 +107,8 @@ const DEPS_AUTOMATION: Module = {
   rootScripts: ['gates'],
 };
 
-const isModuleName = (value: string): value is ModuleName =>
-  MODULE_NAMES.some(m => m === value);
+/** 모듈 이름이면 목록에서 찾은 그 값, 아니면 undefined — 입력 문자열을 ModuleName이라고 믿지 않는다 */
+const moduleName = (value: string) => MODULE_NAMES.find(m => m === value);
 
 function fail(message: string): never {
   console.error(message);
@@ -128,10 +128,11 @@ function parseArgs(argv: readonly string[]) {
     if (!m) fail(`모르는 인자: ${arg}`);
     without = new Set();
     for (const item of (m[1] ?? '').split(',').filter(s => s !== '')) {
-      if (!isModuleName(item)) {
+      const found = moduleName(item);
+      if (found === undefined) {
         fail(`모르는 모듈: ${item} (${MODULE_NAMES.join('·')} 중에서)`);
       }
-      without.add(item);
+      without.add(found);
     }
   }
   return { name, without };
@@ -229,8 +230,7 @@ function applyModuleBlocks(text: string, without: ReadonlySet<ModuleName>) {
   const removed = text.replace(
     /^[ \t]*<!-- module:([a-z]+):start -->\n[\s\S]*?^[ \t]*<!-- module:\1:end -->\n/gm,
     (block, name: string) =>
-      ALWAYS_REMOVED_BLOCKS.includes(name) ||
-      (isModuleName(name) && without.has(name))
+      ALWAYS_REMOVED_BLOCKS.includes(name) || [...without].some(m => m === name)
         ? ''
         : block,
   );
