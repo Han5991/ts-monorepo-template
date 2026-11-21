@@ -243,7 +243,7 @@ describe('타입 오류를 덮는 문법', () => {
   });
 });
 
-// 타입 정보를 쓰는 규칙(ADR 0018) — base에 있어 어느 패키지의 어느 TS 파일에서나 같다
+// 타입 정보를 쓰는 규칙(ADR 0019) — base에 있어 어느 패키지의 어느 TS 파일에서나 같다
 describe('타입 정보를 쓰는 규칙', () => {
   const MEMBER_OF_ANY = '@typescript-eslint/no-unsafe-member-access';
   const READ_NAME =

@@ -25,7 +25,7 @@ export const base = defineConfig([
   js.configs.recommended,
   tseslint.configs.recommended,
   {
-    // 타입 정보를 쓰는 규칙(ADR 0018) — any 흘리기, 기다리지 않은 promise, 객체를 문자열로 찍기 등. 파일마다 가장 가까운 tsconfig
+    // 타입 정보를 쓰는 규칙(ADR 0019) — any 흘리기, 기다리지 않은 promise, 객체를 문자열로 찍기 등. 파일마다 가장 가까운 tsconfig
     // 프로젝트의 타입으로 판단하고, 어느 tsconfig에도 없는 TS 파일은 건너뛰지 않고 파싱 오류로 멈춘다.
     // recommended는 바로 위에 있어 타입 정보를 쓰는 규칙만 더한다. 아래 블록보다 앞에 둬서 base가 바꾼 옵션이 이긴다
     files: ['**/*.{ts,tsx,mts,cts}'],

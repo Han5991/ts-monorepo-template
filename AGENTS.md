@@ -40,7 +40,7 @@
 - [0015](docs/adr/0015-file-suffix-dictionary.md) 화면 앱의 파일 접미사는 한 가지 일을 말한다
 - [0016](docs/adr/0016-no-type-escape-hatches.md) 타입 오류를 단언(`as`·`!`)이나 `@ts-expect-error`로 덮지 못하게 lint로 막는다
 - [0017](docs/adr/0017-ci-fix-checked-by-test-results.md) CI 자동 수정 패치는 테스트 결과로도 검사한다: 돌던 테스트는 계속 돌고, 실패한 테스트의 파일은 고치지 않는다
-- [0018](docs/adr/0018-type-checked-lint-everywhere.md) 타입 정보를 쓰는 lint 규칙(any 흘리기·기다리지 않은 promise 등)을 공통 설정에서 모든 TS 파일에 켠다
+- [0019](docs/adr/0019-type-checked-lint-everywhere.md) 타입 정보를 쓰는 lint 규칙(any 흘리기·기다리지 않은 promise 등)을 공통 설정에서 모든 TS 파일에 켠다
 
 <!-- adr-index:end -->
 
