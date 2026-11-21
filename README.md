@@ -52,6 +52,8 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - 규칙을 주석으로 끄지 못한다 — `noInlineConfig` + `eslint-comments/no-use`
 - 타입 오류를 단언(`as`·`!`)이나 `@ts-expect-error`로 덮지 못한다(`as const`·`satisfies`는 된다) —
   `consistent-type-assertions`·`no-non-null-assertion`·`ban-ts-comment`
+- 바깥 입력(`JSON.parse`·`res.json()`)의 `any`를 타입 있는 자리로 흘리기, 기다리지 않은 promise, `'[object Object]'`로 찍히는
+  문자열 — typescript-eslint의 타입 정보 규칙(`recommendedTypeChecked`), 모든 TS 파일
 - lint 설정이 실제로 막는지 — `packages/eslint-config/guards.test.mts`가 위반을 넣어 확인한다(양성 대조 포함)
 - 상대 경로 import 금지(`#/` 별칭·패키지 이름만) — `no-restricted-imports`
 - 엄격 타입(`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes` 등) — `packages/tsconfig/base.json`

@@ -7,9 +7,12 @@ import boundaries from 'eslint-plugin-boundaries';
 import tseslint from 'typescript-eslint';
 import type { Linter } from 'eslint';
 
+// 워크스페이스 루트. 이 파일 위치에서 계산하는 파일 시스템 경로라 import 별칭을 쓸 수 없다
+const WORKSPACE_ROOT = path.resolve(import.meta.dirname, '..', '..');
+
 /**
  * 공통 규칙. 각 앱·패키지는 자기 경로의 eslint.config.mts에서 `base`를 펼치고
- * 그 위에 자기 규칙만 얹는다 (상속 구조).
+ * 그 위에 자기 규칙만 얹는다 (상속 구조). 타입 정보를 쓰는 규칙도 여기 있어 모든 TS 파일에 켜진다 — 패키지마다 켤 것이 없다.
  *
  * ESLint 10은 린트하는 파일의 디렉터리에서 위로 올라가며 가장 가까운 설정 파일을 쓴다.
  * 그래서 패키지 안의 파일은 그 패키지 설정이 적용된다. 이 패키지가 바뀌면 turbo가
@@ -21,6 +24,21 @@ export const base = defineConfig([
   },
   js.configs.recommended,
   tseslint.configs.recommended,
+  {
+    // 타입 정보를 쓰는 규칙(ADR 0018) — any 흘리기, 기다리지 않은 promise, 객체를 문자열로 찍기 등. 파일마다 가장 가까운 tsconfig
+    // 프로젝트의 타입으로 판단하고, 어느 tsconfig에도 없는 TS 파일은 건너뛰지 않고 파싱 오류로 멈춘다.
+    // recommended는 바로 위에 있어 타입 정보를 쓰는 규칙만 더한다. 아래 블록보다 앞에 둬서 base가 바꾼 옵션이 이긴다
+    files: ['**/*.{ts,tsx,mts,cts}'],
+    extends: [tseslint.configs.recommendedTypeCheckedOnly],
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        // tsconfig를 이 디렉터리까지만 찾는다 — 루트로 둬야 패키지의 eslint.config.mts(패키지 tsconfig 밖)를 루트 tsconfig.json으로
+        // 찾는다. 명시해야 한 프로세스가 여러 패키지 설정을 읽을 때(가드 테스트·에디터) "tsconfig 루트 후보가 여럿"이라는 거부도 없다
+        tsconfigRootDir: WORKSPACE_ROOT,
+      },
+    },
+  },
   {
     // 규칙은 설정 파일에서만 바뀐다 — 코드 주석(eslint-disable 등)으로 끄는 길을 막아, 예외가 늘 설정 diff로 드러나게.
     // noInlineConfig는 주석을 무시하고 경고만 내므로, "끈 줄 알았는데 안 꺼진" 죽은 주석이 남지 않게 주석 자체를 오류로 만든다
@@ -56,19 +74,6 @@ export const base = defineConfig([
     },
   },
 ]);
-
-/**
- * 타입 정보를 쓰는 TS 규칙(기다리지 않은 promise, any 흘리기 등). 패키지의 tsconfig를 읽어 판단한다 —
- * 패키지마다 자기 디렉터리를 넘긴다(`import.meta.dirname`)
- */
-export const typeChecked = (tsconfigRootDir: string, files: string[]) =>
-  defineConfig({
-    files,
-    extends: [tseslint.configs.recommendedTypeChecked],
-    languageOptions: {
-      parserOptions: { projectService: true, tsconfigRootDir },
-    },
-  });
 
 /** 테스트·테스트 헬퍼 파일 (Node에서만 돈다) */
 export const TEST_FILES = ['**/*.test.{ts,tsx}', '**/src/test/**'];
@@ -109,10 +114,6 @@ function relativeImportBan() {
 // 클린 아키텍처의 의존 방향을 element로 적는다: element는 폴더 단위,
 // 기본 금지, 허용만 나열한다 — 로컬 레이어·워크스페이스 패키지·npm 모듈·Node 코어 모듈 모두.
 // 같은 element 안은 자유이고, 프로덕션은 테스트 파일을 import할 수 없으며, 테스트는 무엇이든 import한다.
-
-// 워크스페이스 패키지는 pnpm 심링크의 realpath(packages/...)로 해석되므로 기준 경로를 워크스페이스
-// 루트로 둔다. 이 파일 위치에서 계산하는 파일 시스템 경로라 import 별칭을 쓸 수 없다.
-const WORKSPACE_ROOT = path.resolve(import.meta.dirname, '..', '..');
 
 // 워크스페이스 패키지 하나가 element 하나다 — 새 패키지가 생겨도 누가 열 수 있는지는 layers에 적어야 열린다
 const WORKSPACE_PACKAGES = readdirSync(path.join(WORKSPACE_ROOT, 'packages'), {
@@ -155,9 +156,6 @@ export function layers(packageDir: string, list: Layer[]) {
 
   return defineConfig({
     files: ['src/**/*.{ts,tsx}', 'scripts/**/*.ts'],
-    // 패키지 루트를 명시한다 — 한 프로세스가 여러 패키지 설정을 불러오면(가드 테스트·에디터) typescript-eslint가
-    // "tsconfig 루트 후보가 여럿"이라며 파싱을 거부한다
-    languageOptions: { parserOptions: { tsconfigRootDir: packageDir } },
     plugins: { boundaries },
     settings: {
       'import/resolver': {
@@ -166,6 +164,7 @@ export function layers(packageDir: string, list: Layer[]) {
           project: path.join(packageDir, 'tsconfig.json'),
         },
       },
+      // 워크스페이스 패키지는 pnpm 심링크의 realpath(packages/...)로 해석되므로 기준 경로를 워크스페이스 루트로 둔다
       'boundaries/root-path': WORKSPACE_ROOT,
       'boundaries/elements-single-match': true,
       'boundaries/elements': [
