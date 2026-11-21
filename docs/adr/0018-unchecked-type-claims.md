@@ -12,7 +12,7 @@ status: accepted
     `TSTypePredicate`. 함수 본문·오버로드·`declare`·타입 별칭 어디에 적었든 막는다.
   - 확정 대입 단언(`let x!: T`, 필드·`accessor` 필드 `x!: T`) — `local/no-definite-assignment-assertion`, 셀렉터 `[definite=true]`.
   - `declare` 필드(`declare x: T`) — `local/no-declare-field`, 셀렉터 `PropertyDefinition[declare=true]`. 최상위 `declare` 값
-    선언과 앰비언트 블록 안의 값은 이 규칙이 아니라 ADR 0019의 `local/no-ambient-value`가 막는다.
+    선언과 앰비언트 블록 안의 값은 이 규칙이 아니라 ADR 0020의 `local/no-ambient-value`가 막는다.
 - 막히면 컴파일러가 확인하는 코드로 바꾼다.
   - 가드가 필요하면 반환 타입을 적지 않는다. TS가 본문이 실제로 좁히는 만큼만 서술을 추론한다(`x => typeof x === 'string'`).
   - 문자열이 목록의 값인지는 목록에서 찾아 그 값을 돌려받는다(`NAMES.find(n => n === v)`, 타입은 `Name | undefined`).
@@ -28,7 +28,7 @@ status: accepted
   `no-restricted-syntax`와 함께 걸리는지, 추론된 서술·`find`·초기값·생성자 대입이 통과하는지(양성 대조)를 본다.
 - lint가 못 보는 것 — 규칙으로만 남기고 리뷰에서 본다.
   - 라이브러리에서 흘러드는 `any`(ADR 0016).
-- 이 결정 때 "lint가 못 보는 것"으로 남긴 오버로드 시그니처와 앰비언트 값 선언(`.d.ts` 포함)은 ADR 0019가 이어서 막는다.
+- 이 결정 때 "lint가 못 보는 것"으로 남긴 오버로드 시그니처와 앰비언트 값 선언(`.d.ts` 포함)은 ADR 0020가 이어서 막는다.
 
 ## 이유
 
