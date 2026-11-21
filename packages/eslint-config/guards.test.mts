@@ -2,12 +2,21 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { moduleFolderProblems } from '@app/eslint-config';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 // lint 설정이 실제로 막는지 확인한다. 규칙을 지우거나 풀면(예외를 넓히면) 여기서 실패한다 —
 // "설정에 적혀 있다"가 아니라 "위반을 넣으면 오류가 난다"를 증명한다.
 const ROOT = path.resolve(import.meta.dirname, '..', '..');
+
+// 이 프로세스는 같은 파일을 내용을 바꿔 가며 여러 번 lint한다 — 한 번만 도는 실행(single run)이 아니다. typescript-eslint는
+// CI(CI=true)에서 single run으로 보고, 내용이 디스크와 같은 파일은 디스크로 만든 Program에서 읽는다. 그러면 탐침 뒤 되돌리기(디스크와
+// 같은 내용)가 project service에 닿지 않아 탐침 내용이 남고, 뒤 검사가 바뀐 타입을 본다(CI에서 API 양성 대조가 그렇게 실패했다)
+process.env.TSESTREE_SINGLE_RUN = 'false';
 const eslint = new ESLint({ cwd: ROOT });
+
+// 처음 보는 tsconfig 프로젝트를 읽는 검사는 느리다 — CI에서 하나에 7초까지 걸렸다(turbo가 다른 작업을 함께 돌린다). 기본 5초로는
+// 모자라다
+vi.setConfig({ testTimeout: 60_000 });
 
 /**
  * 저장소에 있는 파일의 경로로, 그 내용 대신 `code`를 lint한다 — 그 경로에 가장 가까운 eslint.config.mts가 적용된다. 디스크의 파일은
@@ -16,6 +25,8 @@ const eslint = new ESLint({ cwd: ROOT });
  * 있는 파일이어야 한다: 타입 정보를 쓰는 규칙은 tsconfig 프로젝트에 든 파일만 파싱하는데, 프로젝트는 디스크에 있는 파일로 만들어진다
  * (없는 경로는 "project service가 찾지 못했다"는 파싱 오류). 검사한 뒤 그 파일의 실제 내용으로 다시 lint해 되돌린다 — 타입 정보를
  * 쥔 project service는 프로세스에 하나이고 연 내용을 그대로 들고 있어서, 안 되돌리면 뒤 검사가 이 파일의 타입을 `code`로 본다.
+ * 같은 이유로 탐침은 차례로 돈다고 기댄다(Vitest는 한 파일의 테스트를 차례로 돌린다) — concurrent로 돌리면 되돌리기 전의 탐침 내용을
+ * 다른 검사가 볼 수 있다.
  */
 async function ruleIds(file: string, code: string): Promise<string[]> {
   const filePath = path.join(ROOT, file);
@@ -41,8 +52,9 @@ const FILE_KINDS = {
 type FileKind = keyof typeof FILE_KINDS;
 
 /**
- * 루트와 패키지(apps/*·packages/*)마다 lint가 보는 TS 파일을 종류별로 하나씩 — [어디, 종류, 파일]. 저장소를 읽어 고르므로 새
- * 패키지도 저절로 든다. 테스트 이름은 파일이 아니라 어디·종류로 짓는다 — 고른 파일의 이름이 바뀌어도 같은 테스트로 남는다
+ * 루트와 패키지(apps/*·packages/*)마다 lint가 보는 TS 파일을 종류별로 하나씩 — [어디, 종류, 파일]. 패키지 목록은 저장소를 읽어
+ * 만들므로 새 패키지도 저절로 든다. 표본은 각 폴더 바로 아래와 src·scripts 아래에서만 고른다 — 다른 폴더(예: e2e)에만 규칙을 끈
+ * 예외는 여기서 잡히지 않는다. 테스트 이름은 파일이 아니라 어디·종류로 짓는다 — 고른 파일의 이름이 바뀌어도 같은 테스트로 남는다
  * (CI 자동 수정 검사는 이름이 바뀐 테스트를 사라진 것으로 본다).
  */
 function oneFilePerKind(): [string, string, string][] {

@@ -26,6 +26,9 @@ status: accepted
   - 탐침은 저장소에 있는 파일의 경로로 넣는다. 타입 정보는 디스크에 있는 파일로 만든 프로젝트에서만 나와서 없는 경로는 파싱 오류가
     난다. 검사 뒤에는 그 파일의 실제 내용으로 다시 lint해 되돌린다 — project service는 프로세스에 하나이고 연 내용을 그대로 들고
     있어서, 안 되돌리면 뒤 검사가 바뀐 타입을 본다.
+  - 가드 테스트는 한 번만 도는 실행(single run)이 아니라고 알린다(`TSESTREE_SINGLE_RUN=false`). typescript-eslint는 CI(`CI=true`)를
+    single run으로 보고, 내용이 디스크와 같은 파일은 디스크로 만든 Program에서 읽는다 — 그러면 되돌리기가 project service에 닿지 않는다.
+  - 처음 보는 tsconfig 프로젝트를 읽는 검사는 몇 초 걸려 Vitest 기본 시간 제한(5초)을 넘을 수 있다. 시간 예산을 넉넉히 준다.
   - 이 테스트는 다른 패키지의 타입까지 읽으므로 turbo가 캐시하지 않는다.
 
 ## 이유
@@ -56,5 +59,10 @@ typescript-eslint는 tsconfig 루트 후보가 여럿이라며 파싱을 거부�
   https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/typescript-estree/src/useProgramFromProjectService.ts
 - project service는 프로세스에 하나다(모듈 변수에 처음 한 번 만든다):
   https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/typescript-estree/src/parseSettings/createParseSettings.ts
+- `projectService`를 쓰면 `CI=true`일 때 single run으로 보고, `TSESTREE_SINGLE_RUN=false`면 single run이 아니다:
+  https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/typescript-estree/src/parseSettings/inferSingleRun.ts
+- single run에서는 내용이 디스크와 같은 파일을 tsconfig마다 한 번 만든 Program에서 읽고, 다를 때만 project service로 간다
+  (`useSingleRunProgramForProjectService`):
+  https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/typescript-estree/src/parser.ts
 - TypeScript 5.7부터 가장 가까운 tsconfig.json이 파일을 담지 않으면 위 디렉터리의 tsconfig.json을 계속 찾는다:
   https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/release-notes/TypeScript%205.7.md
