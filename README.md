@@ -75,6 +75,12 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - `packages/docs-index` — `docs/adr` → AGENTS.md 결정 색인 생성·검사, 문서·주석이 가리키는 것(저장소 경로·ADR 번호·`pnpm` 명령) 검사
 - `docs/adr` — 설계 결정 기록
 
+<!-- module:claude:start -->
+
+- `packages/ci-fix-guard` — CI 자동 수정 패치를 테스트 결과로 검사한다(패치 전후의 테스트 기록 비교)
+
+<!-- module:claude:end -->
+
 <!-- module:api:start -->
 
 - `apps/api` — Hono 서버: application(유스케이스·포트) / infrastructure(어댑터) / interface(HTTP) / main(조립)
@@ -118,7 +124,8 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
   - `claude-code-review.yml` PR 코드 리뷰, `claude.yml` `@claude` 멘션 응답
   - `claude-ci-fix.yml` PR의 CI가 깨지면 고쳐서 자동 머지를 건다. 읽기 전용 Claude → LLM 없는 검사 → 코드를 실행하지
     않는 publish로 잡을 나누고, 앱·패키지의 src·scripts·루트 README에 이미 있는 파일의 수정만 받는다(설정·lint 규칙·
-    에이전트 지침·결정 기록·CI는 거부).
+    에이전트 지침·결정 기록·CI는 거부). 패치 전후의 테스트 결과도 비교해, 돌던 테스트가 꺼지거나 실패한 테스트가 든 파일을
+    고친 패치는 올리지 않는다.
     한 번만 시도하고, 못 고치면 멘션한다.
   - `claude-deps-audit.yml` 매주 전이 의존성 취약점을 pnpm의 `overrides`로 막고 죽은 override를 정리해 PR을 연다(자동 머지).
     저장소 설정 "Allow GitHub Actions to create and approve pull requests"가 켜져 있어야 한다.

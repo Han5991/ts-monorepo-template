@@ -39,6 +39,7 @@
 - [0014](docs/adr/0014-flat-single-door-folders.md) 한 가지 일을 하고 문 하나로만 들어오는 작은 폴더는 하위 폴더로 나누지 않는다
 - [0015](docs/adr/0015-file-suffix-dictionary.md) 화면 앱의 파일 접미사는 한 가지 일을 말한다
 - [0016](docs/adr/0016-no-type-escape-hatches.md) 타입 오류를 단언(`as`·`!`)이나 `@ts-expect-error`로 덮지 못하게 lint로 막는다
+- [0017](docs/adr/0017-ci-fix-checked-by-test-results.md) CI 자동 수정 패치는 테스트 결과로도 검사한다: 돌던 테스트는 계속 돌고, 실패한 테스트의 파일은 고치지 않는다
 
 <!-- adr-index:end -->
 

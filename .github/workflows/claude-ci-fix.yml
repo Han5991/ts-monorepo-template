@@ -5,7 +5,8 @@ name: Claude CI fix
 # 잡을 셋으로 나눈다 — 모델과 쓰기 권한을 한 잡에 두지 않는다.
 #   fix     Claude. 읽기 전용 토큰, checkout에 자격 증명을 남기지 않고, 캐시 없이. 파일만 고쳐 패치로 내보낸다.
 #           실패 로그·의존성 내용은 신뢰하지 않는 입력이라, 여기서 프롬프트 주입이 있어도 쓸 수 있는 자격 증명이 없다.
-#   verify  LLM·secret 없음. 패치를 검사하고(check-fix-patch.sh) 적용해 전체 검사를 돌린다. 캐시 없음.
+#   verify  LLM·secret 없음. 패치를 검사하고(check-fix-patch.sh) 적용해 전체 검사를 돌리고, 패치 전후의 테스트 결과를 비교한다
+#           (`packages/ci-fix-guard`, ADR 0017). 캐시 없음.
 #   publish 쓰기 권한. 저장소 코드를 실행하지 않는다 — 검사한 패치를 적용해 push, 승인 대기 CI 승인, 자동 머지, 코멘트만.
 #
 # - 캐시를 쓰지 않는 이유: workflow_run 잡은 기본 브랜치 범위라, 여기서 저장한 캐시가 이후 모든 CI에 실린다.
@@ -120,6 +121,8 @@ jobs:
             커밋·push·코멘트를 하지 않는다(도구도 없다). 다음 잡이 당신의 변경을 검사하고 전체 검사를 돌려 통과할 때만 올린다.
             그 잡은 `.github/scripts/check-fix-patch.sh`로 변경을 검사하고, 하나라도 걸리면 변경 전체를 버린다. 받는 경로와 거부하는
             것은 그 파일 머리 주석에 있으니 고치기 전에 읽는다(판정은 기본 브랜치의 판으로 한다 — 이 브랜치의 판과 다를 수 있다).
+            그 잡은 패치 전후의 테스트 결과도 비교한다(ADR 0017): 패치 전에 돌던 테스트가 패치 뒤에 돌지 않거나(건너뛰기·todo·
+            fails·지우기), 패치 전에 실패한 테스트가 든 파일을 고치면 거부한다. 테스트가 아니라 테스트가 검사하는 코드를 고친다.
             받지 않는 파일(설정 등)을 바꿔야만 고쳐지면 아무것도 고치지 말고 이유만 남긴다. 검사·테스트는 여기서 돌리지 않는다(그
             잡이 돌린다).
             </권한>
@@ -209,19 +212,25 @@ jobs:
           name: ci-fix
           path: ${{ runner.temp }}/ci-fix
 
-      # 검사 스크립트는 기본 브랜치(이 워크플로가 도는 판)의 것을 쓴다 — PR 브랜치의 판을 믿지 않는다.
+      # 검사 스크립트와 테스트 결과 비교는 기본 브랜치(이 워크플로가 도는 판)의 것을 쓴다 — PR 브랜치의 판을 믿지 않는다.
       # 작업 트리 안에 두면 이후 검사(lint·포맷)에 섞이므로 꺼내 놓고 지운다
       - name: Checkout checker from the default branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: .trusted
-          sparse-checkout: .github/scripts
+          sparse-checkout: |
+            .github/scripts
+            packages/ci-fix-guard
           persist-credentials: false
 
+      # 테스트 결과 비교(보고서·CLI)는 실행할 때 의존성을 쓰지 않는다 — package.json(imports)과 src만 옮긴다
       - name: Move checker out of the workspace
         run: |
           cp .trusted/.github/scripts/check-fix-patch.sh "$RUNNER_TEMP/check-fix-patch.sh"
+          mkdir -p "$RUNNER_TEMP/ci-fix-guard"
+          cp .trusted/packages/ci-fix-guard/package.json "$RUNNER_TEMP/ci-fix-guard/"
+          cp -r .trusted/packages/ci-fix-guard/src "$RUNNER_TEMP/ci-fix-guard/src"
           rm -rf .trusted
 
       - name: Check patch
@@ -239,30 +248,54 @@ jobs:
             echo "result=rejected" >> "$GITHUB_OUTPUT"
             echo "why=${why#거부: }" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          git -c core.hooksPath=/dev/null apply -- "$patch"
-          echo "result=applied" >> "$GITHUB_OUTPUT"
+          echo "result=checked" >> "$GITHUB_OUTPUT"
 
+      # 패치를 적용하기 전에 설치한다 — 패치 전의 테스트를 먼저 돌려야 하고, 패치는 의존성(package.json·lockfile)을 고치지 못한다
       - name: Setup workspace (no cache)
-        if: steps.gate.outputs.result == 'applied'
+        if: steps.gate.outputs.result == 'checked'
         uses: ./.github/actions/setup
         with:
           cache: 'false'
+
+      # 패치 전 커밋(CI가 실패한 커밋)의 테스트를 돌려 테스트마다 기록을 남긴다. 실패하는 것이 정상이라 결과는 보지 않는다.
+      # 테스트는 turbo가 아니라 pnpm으로 돌린다 — turbo는 선언하지 않은 환경 변수(기록할 곳)를 작업에서 지운다
+      - name: Record tests before the patch
+        if: steps.gate.outputs.result == 'checked'
+        env:
+          CI_FIX_GUARD_LEDGER: ${{ runner.temp }}/ledger-before
+        run: pnpm -r --no-bail run test --reporter=default --reporter="$RUNNER_TEMP/ci-fix-guard/src/reporter.ts" || true
+
+      - name: Apply patch
+        id: apply
+        if: steps.gate.outputs.result == 'checked'
+        run: |
+          git -c core.hooksPath=/dev/null apply -- "$RUNNER_TEMP/ci-fix/fix.patch"
+          echo "result=applied" >> "$GITHUB_OUTPUT"
 
       - name: Full checks
         id: check
         if: always()
         env:
-          GATE: ${{ steps.gate.outputs.result }}
+          GATE: ${{ steps.apply.outputs.result || steps.gate.outputs.result }}
           GATE_WHY: ${{ steps.gate.outputs.why }}
+          CI_FIX_GUARD_LEDGER: ${{ runner.temp }}/ledger-after
         run: |
           if [ "$GATE" != applied ]; then
             echo "result=${GATE:-error}" >> "$GITHUB_OUTPUT"
             echo "why=$GATE_WHY" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          if pnpm turbo run lint check-types test && pnpm check-types:tooling && pnpm lint:tooling && pnpm format:check; then
+          reporter="$RUNNER_TEMP/ci-fix-guard/src/reporter.ts"
+          if ! { pnpm turbo run lint check-types &&
+            pnpm -r run test --reporter=default --reporter="$reporter" &&
+            pnpm check-types:tooling && pnpm lint:tooling && pnpm format:check; }; then
+            echo "result=fail" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          # 패치 전에 돌던 테스트가 꺼졌거나 패치 전에 실패한 테스트가 든 파일을 고쳤으면 거부한다(ADR 0017)
+          if why="$(node "$RUNNER_TEMP/ci-fix-guard/src/cli.ts" "$RUNNER_TEMP/ledger-before" "$CI_FIX_GUARD_LEDGER" "$RUNNER_TEMP/ci-fix/fix.patch")"; then
             echo "result=pass" >> "$GITHUB_OUTPUT"
           else
-            echo "result=fail" >> "$GITHUB_OUTPUT"
+            echo "result=rejected" >> "$GITHUB_OUTPUT"
+            echo "why=${why#거부: }" >> "$GITHUB_OUTPUT"
           fi
 
   publish:

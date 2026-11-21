@@ -1,0 +1,34 @@
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import { LEDGER_DIR_ENV } from '#/reporter.ts';
+
+// verify 잡(워크플로)은 이 패키지를 import할 수 없어 환경 변수 이름과 파일 경로를 글로 적는다 — 그 사본이 어긋나지 않게 잠근다.
+// 어긋나면 보고서가 기록할 곳을 받지 못해 실행을 실패시키거나 비교가 기록을 찾지 못해, 모든 자동 수정이 거부된다.
+const PACKAGE_DIR = path.resolve(import.meta.dirname, '..');
+const WORKFLOW = path.resolve(
+  PACKAGE_DIR,
+  '../../.github/workflows/claude-ci-fix.yml',
+);
+
+describe('verify 잡이 적은 이름과 경로', () => {
+  const text = readFileSync(WORKFLOW, 'utf8');
+
+  it('패치 전과 뒤에 보고서가 읽는 환경 변수로 기록할 곳을 넘긴다', () => {
+    expect(text.match(new RegExp(`\\b${LEDGER_DIR_ENV}:`, 'g'))).toHaveLength(
+      2,
+    );
+  });
+
+  it('기본 브랜치에서 이 패키지를 꺼내 온다', () => {
+    expect(text).toMatch(/sparse-checkout: \|[^]*?packages\/ci-fix-guard\n/);
+  });
+
+  it.each(['src/reporter.ts', 'src/cli.ts'])(
+    '복사한 판의 %s를 쓰고, 그 파일이 이 패키지에 있다',
+    file => {
+      expect(text).toContain(`ci-fix-guard/${file}`);
+      expect(existsSync(path.join(PACKAGE_DIR, file))).toBe(true);
+    },
+  );
+});
