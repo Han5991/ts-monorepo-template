@@ -14,7 +14,8 @@ const app = createHttpApp({
 
 const get = async (path: string) => {
   const res = await app.request(path);
-  return { status: res.status, body: (await res.json()) as unknown };
+  const body: unknown = await res.json();
+  return { status: res.status, body };
 };
 
 describe('HTTP API', () => {
