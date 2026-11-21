@@ -84,10 +84,7 @@ let project = '';
 let reporter = '';
 let cli = '';
 
-/**
- * 안쪽 실행을 돌리고 종료 코드와 출력을 돌려준다. 띄우지 못했거나, 시간 제한에 걸렸거나, 신호로 끝났으면 throw한다 — 그 경우를
- * 종료 코드로 바꾸면 "실행이 실패해야 한다"는 단언이 끝나지 않은 실행으로 거짓 통과한다.
- */
+/** 안쪽 실행을 돌리고 종료 코드와 출력을 돌려준다. 띄우지 못했거나, 시간 제한에 걸렸거나, 신호로 끝났으면 throw한다 */
 function runChild(
   args: readonly string[],
   env: NodeJS.ProcessEnv,
@@ -176,6 +173,15 @@ beforeAll(() => {
 
 afterAll(() => {
   rmSync(work, { recursive: true, force: true });
+});
+
+describe('안쪽 실행', () => {
+  it('신호로 끝나면 종료 코드 대신 예외로 알린다 — 종료 코드로 바꾸면 "실행이 실패해야 한다"는 단언이 끝나지 않은 실행으로 거짓 통과한다', () => {
+    // 시간 제한에 걸린 실행도 SIGKILL로 끝나 같은 길로 온다. 제한(30초)을 기다리지 않게 자식이 스스로 신호로 끝난다
+    expect(() =>
+      runChild(['-e', "process.kill(process.pid, 'SIGKILL')"], process.env),
+    ).toThrow('안쪽 실행이 제대로 끝나지 않았다(SIGKILL)');
+  });
 });
 
 describe('보고서', { timeout: TEST_TIMEOUT }, () => {
