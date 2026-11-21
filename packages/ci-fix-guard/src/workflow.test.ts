@@ -23,17 +23,20 @@ describe('verify 잡이 적은 이름과 경로', () => {
     );
     return lines.slice(start, end === -1 ? undefined : end).join('\n');
   };
-  /** 스텝이 보고서에 넘기는 기록 디렉터리(runner.temp 아래 이름) — 넘기지 않으면 throw한다 */
-  const ledgerDirOf = (step: string): string => {
-    const dir = new RegExp(
-      `${LEDGER_DIR_ENV}: \\$\\{\\{ runner\\.temp \\}\\}/(\\S+)`,
-    ).exec(step)?.[1];
+  /** 스텝이 보고서에 넘기는 기록 디렉터리(runner.temp 아래) */
+  const REPORTER_DIR = new RegExp(
+    `${LEDGER_DIR_ENV}: \\$\\{\\{ runner\\.temp \\}\\}/(\\S+)`,
+  );
+  /**
+   * 스텝에서 찾은 RUNNER_TEMP 아래 디렉터리. 실행할 때처럼 RUNNER_TEMP 뒤에 이어 붙여 푼다(끝의 `/`, 사이의 `./`·`//`·`..`) —
+   * 글자가 달라도 같은 디렉터리면 같은 값이 된다. 못 찾으면 throw한다
+   */
+  const runnerTempDir = (step: string, pattern: RegExp): string => {
+    const dir = pattern.exec(step)?.[1];
     if (dir === undefined) {
-      throw new Error(
-        `스텝이 ${LEDGER_DIR_ENV}로 기록 디렉터리를 넘기지 않는다`,
-      );
+      throw new Error(`스텝에서 ${String(pattern)}에 맞는 디렉터리가 없다`);
     }
-    return dir;
+    return path.posix.resolve(`/runner-temp/${dir}`);
   };
 
   it('패치 전과 뒤에 보고서가 읽는 환경 변수로 기록할 곳을 넘긴다', () => {
@@ -58,20 +61,22 @@ describe('verify 잡이 적은 이름과 경로', () => {
   // 패치 전 기록 디렉터리는 두 스텝에 따로 적는다(이유는 워크플로의 그 자리에). 어긋나면 비교가 없는 디렉터리를 읽어 모든 패치를
   // 기록이 없다는 이유로 거부하고, 기록 스텝의 경고도 찍히지 않는다
   it('비교는 두 보고서가 기록한 디렉터리를 패치 전·뒤 순서로 읽는다', () => {
-    const recorded = ledgerDirOf(stepNamed('Record tests before the patch'));
     const check = stepNamed('Full checks');
-    const compared = new RegExp(
+    // 둘째 인자가 그 스텝의 보고서가 읽는 환경 변수일 때만 맞는다 — 패치 뒤 기록은 같은 스텝의 보고서가 쓴 곳에서 읽는다
+    const cliBeforeDir = new RegExp(
       `ci-fix-guard/src/cli\\.ts" "\\$RUNNER_TEMP/([^"]+)" "\\$${LEDGER_DIR_ENV}"`,
-    ).exec(check)?.[1];
-    expect(compared).toBe(recorded);
+    );
+    expect(runnerTempDir(check, cliBeforeDir)).toBe(
+      runnerTempDir(stepNamed('Record tests before the patch'), REPORTER_DIR),
+    );
     expect(check).toContain(`${LEDGER_DIR_ENV}:`);
   });
 
-  // 같으면 패치 뒤 보고서가 같은 파일 이름으로 패치 전 기록을 덮어쓴다. 비교가 패치 뒤 결과끼리 맞대게 되어, 돌던 테스트를 끈 패치도
-  // 실패한 테스트의 파일을 고친 패치도 조용히 통과한다
+  // 같은 디렉터리면(끝의 `/`처럼 글자만 달라도) 패치 뒤 보고서가 같은 파일 이름으로 패치 전 기록을 덮어쓴다. 비교가 패치 뒤
+  // 결과끼리 맞대게 되어, 돌던 테스트를 끈 패치도 실패한 테스트의 파일을 고친 패치도 조용히 통과한다
   it('패치 뒤 기록은 패치 전 기록과 다른 디렉터리에 남긴다', () => {
-    expect(ledgerDirOf(stepNamed('Full checks'))).not.toBe(
-      ledgerDirOf(stepNamed('Record tests before the patch')),
+    expect(runnerTempDir(stepNamed('Full checks'), REPORTER_DIR)).not.toBe(
+      runnerTempDir(stepNamed('Record tests before the patch'), REPORTER_DIR),
     );
   });
 
