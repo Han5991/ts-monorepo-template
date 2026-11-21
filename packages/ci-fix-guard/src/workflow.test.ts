@@ -25,6 +25,18 @@ describe('verify 잡이 적은 이름과 경로', () => {
     expect(text).toContain('pnpm -r --no-bail --no-sort run test');
   });
 
+  // 다른 디렉터리를 보면 경고가 늘 찍히거나 전혀 찍히지 않는다 — 기록이 빠진 원인을 실행 요약에서 찾지 못한다
+  it('패치 전 기록이 하나도 남지 않으면 경고를 찍는다 — 보고서에 넘긴 디렉터리를 본다', () => {
+    const step =
+      /- name: Record tests before the patch\n[^]*?(?=\n\s*- name: )/.exec(
+        text,
+      )?.[0];
+    expect(step).toBeDefined();
+    expect(step).toContain(`${LEDGER_DIR_ENV}:`);
+    expect(step).toContain(`"$${LEDGER_DIR_ENV}"`);
+    expect(step).toContain('::warning::');
+  });
+
   it('기본 브랜치에서 이 패키지를 꺼내 온다', () => {
     expect(text).toMatch(/sparse-checkout: \|[^]*?packages\/ci-fix-guard\n/);
   });
