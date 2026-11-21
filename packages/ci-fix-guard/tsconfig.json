@@ -1,0 +1,8 @@
+{
+  // Node 도구. verify 잡이 cli.ts를 Node의 타입 제거(type stripping)로 바로 실행하므로 지울 수 없는 TS 문법을 tsc에서 막는다.
+  "extends": "@app/tsconfig/lib.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "erasableSyntaxOnly": true
+  }
+}

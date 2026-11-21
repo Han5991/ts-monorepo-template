@@ -1,0 +1,22 @@
+{
+  "name": "@app/ci-fix-guard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "CI 자동 수정 패치를 테스트 결과로 검사한다 — 패치 전에 돌던 테스트는 패치 뒤에도 돌고, 패치 전에 실패한 테스트가 든 파일은 고치지 않는다.",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "check-types": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@app/eslint-config": "workspace:*",
+    "@app/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

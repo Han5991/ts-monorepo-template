@@ -275,3 +275,29 @@ describe.skipIf(!existsSync(path.join(ROOT, 'apps/api/package.json')))(
     });
   },
 );
+
+// init에서 claude 모듈을 빼면 이 패키지가 없으니 건너뛴다
+const GUARD = 'packages/ci-fix-guard/src/probe.ts';
+
+describe.skipIf(
+  !existsSync(path.join(ROOT, 'packages/ci-fix-guard/package.json')),
+)('CI 자동 수정 검사 패키지', () => {
+  // verify 잡이 이 패키지를 node_modules 없는 곳에 복사해 쓴다 — 실행할 때 vitest를 가져오면 그 자리에서 깨진다
+  it('vitest를 값으로 가져오면 막힌다', async () => {
+    expect(
+      await ruleIds(
+        GUARD,
+        "import { startVitest } from 'vitest/node';\nexport const run = startVitest;\n",
+      ),
+    ).toContain('@typescript-eslint/no-restricted-imports');
+  });
+
+  it('양성 대조 — 타입만 가져오면 통과한다', async () => {
+    expect(
+      await ruleIds(
+        GUARD,
+        "import type { Reporter } from 'vitest/node';\nexport type R = Reporter;\n",
+      ),
+    ).toEqual([]);
+  });
+});
