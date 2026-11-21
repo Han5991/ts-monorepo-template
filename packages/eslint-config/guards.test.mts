@@ -90,7 +90,7 @@ describe('도메인', () => {
     expect(await ruleIds(DOMAIN, code)).toContain('no-restricted-syntax');
   });
 
-  // 오버로드 시그니처는 공통 규칙이 막는다(ADR 0019) — 여기서는 함수 선언만 본다
+  // 오버로드 시그니처는 공통 규칙이 막는다(ADR 0020) — 여기서는 함수 선언만 본다
   it('양성 대조 — 선언(상수·함수·기본 내보내기 함수·타입·전역 타입·다시 내보내기)은 통과한다', async () => {
     expect(
       await ruleIds(
@@ -176,7 +176,7 @@ describe('타입 오류를 덮는 문법', () => {
   });
 });
 
-// 공통 규칙(base)이라 어느 패키지에서나 같다 — 컴파일러가 확인하지 않는 타입 주장도 막힌다(ADR 0018·0019).
+// 공통 규칙(base)이라 어느 패키지에서나 같다 — 컴파일러가 확인하지 않는 타입 주장도 막힌다(ADR 0018·0020).
 // 매개변수는 `_x`로 쓴다 — 오늘 다른 규칙을 모두 통과하는 우회 꼴을 그대로 넣는다(`x`로 쓰면 no-unused-vars도 함께 걸린다)
 describe('컴파일러가 확인하지 않는 타입 주장', () => {
   const PREDICATE = 'local/no-type-predicate';
@@ -185,7 +185,8 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
   const OVERLOAD = 'local/no-overload-signature';
   const AMBIENT = 'local/no-ambient-value';
   const DECLARATION_FILE = 'local/no-declaration-file';
-  const DOMAIN_TEST = 'packages/domain/src/task/probe.test.ts';
+  // 있는 테스트 파일의 경로로 넣는다 — 그 내용 대신 탐침 코드를 lint한다
+  const DOMAIN_TEST = 'packages/domain/src/task/task.test.ts';
   const TRUE_GUARD =
     'export const isText = (_x: unknown): _x is string => true;\n';
 
@@ -281,6 +282,12 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
     [
       'declare module 안의 값',
       "declare module 'virtual:probe' {\n  const src: string;\n  export default src;\n}\n",
+      AMBIENT,
+    ],
+    // 그 모듈에서 가져오는 것을 모두 any로 만든다(.d.ts에서 확인 — .ts에서는 moduleDetection: force라 tsc도 막는다)
+    [
+      '본문 없는 declare module',
+      "declare module 'untyped-lib';\nexport {};\n",
       AMBIENT,
     ],
   ])('%s — 막힌다', async (_, code, rule) => {

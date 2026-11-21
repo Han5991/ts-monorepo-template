@@ -11,8 +11,8 @@ status: accepted
   - 오버로드 시그니처(함수·메서드·생성자) — `local/no-overload-signature`. 본문 없는 함수·메서드 가운데 앰비언트가 아닌 것이다
     (`TSDeclareFunction`·본문 없는 `MethodDefinition`, `declare`·앰비언트 블록 안은 뺀다). abstract 메서드와 인터페이스의 호출
     시그니처는 걸리지 않는다.
-  - 앰비언트 값 선언 — `local/no-ambient-value`. `declare const`·`let`·`var`·`function`·`class`·`enum`과, `declare global`·
-    `declare module`·`declare namespace` 안의 같은 선언이다.
+  - 앰비언트 값 선언 — `local/no-ambient-value`. `declare const`·`let`·`var`·`function`·`class`·`enum`, `declare global`·
+    `declare module`·`declare namespace` 안의 같은 선언, 본문 없는 `declare module 'x';`(셀렉터 `[declare=true]:not([body])`)다.
   - `.d.ts` 파일 — `local/no-declaration-file`. 파일 자체를 막는다(`.d.ts`에서만 켜고 셀렉터는 `Program`).
 - 앰비언트 블록 안의 타입만인 선언(`interface`·`type`)은 그대로 허용한다. ADR 0011이 최상위에 둘 수 있는 선언으로 정한 "타입만인
   `declare global`·`declare module`"이고, 이제 그 "타입만인"을 lint가 지킨다.
@@ -54,6 +54,10 @@ status: accepted
 `ReferenceError`가 나고, `declare function parse(x: unknown): Task`는 서술 없이도 캐스트가 된다. `declare global` 안에 함수를 선언하면
 lib 함수에 오버로드가 더해진다 — `function parseInt(x: unknown): T`를 더하면 `parseInt(1)`이 `T`로 컴파일되고 실행하면 숫자 `1`이다.
 ADR 0018을 넣은 변경의 리뷰가 이 길을 짚었고, 위반을 넣어 확인했다.
+
+본문 없는 `declare module 'untyped-lib';`는 그 모듈에서 가져오는 것을 모두 `any`로 만든다 — `.d.ts`에 두면 `lib.whatever.deep()`이
+`number` 자리에 컴파일된다(확인). `.ts`에서는 공통 tsconfig의 `moduleDetection: "force"`가 파일을 모듈로 보게 해 tsc가 모듈 보강
+오류(TS2664)로 막지만, 그 설정이나 `.d.ts` 예외에 기대지 않도록 lint가 따로 막는다.
 
 `.d.ts`는 파일 안의 선언이 `declare` 없이도 앰비언트라, `export const c: number;`가 위 두 규칙 어디에도 걸리지 않았다(확인).
 셀렉터는 파일 이름을 모르므로 파일째 막는다. 이 저장소는 TS만 쓰고 `.d.ts`가 하나도 없어서, 필요해질 때 이유를 적고 여는 편이 싸다.

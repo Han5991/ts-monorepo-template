@@ -34,7 +34,7 @@ const VALUE_DECLARATION =
   ':matches(VariableDeclaration, TSDeclareFunction, ClassDeclaration, TSEnumDeclaration)';
 
 /**
- * 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0019) — 단언(`as`·`!`, ADR 0016)을 막은 뒤 같은 일을 하는 다른 문법이다.
+ * 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0020) — 단언(`as`·`!`, ADR 0016)을 막은 뒤 같은 일을 하는 다른 문법이다.
  * `base`가 여기 있는 규칙을 전부 켠다.
  */
 const typeClaims = {
@@ -59,21 +59,23 @@ const typeClaims = {
     // no-ambient-value가, abstract 메서드는 노드가 달라(TSAbstractMethodDefinition) 걸리지 않는다
     'no-overload-signature': bannedSyntax(
       `TSDeclareFunction:not([declare=true]):not(${AMBIENT_BLOCK} TSDeclareFunction), MethodDefinition[value.type="TSEmptyBodyFunctionExpression"]:not(ClassDeclaration[declare=true] MethodDefinition):not(${AMBIENT_BLOCK} MethodDefinition)`,
-      '오버로드 시그니처는 구현과 느슨하게만 맞춰 봐서 확인 없는 타입 주장이 된다(`unknown`을 돌려주는 구현에 `T`를 돌려주는 오버로드가 컴파일된다) — 입력마다 함수를 나누거나, 이름으로 인덱싱한 mapped type에서 찾아 부르거나, 합집합을 돌려주고 호출부가 좁힌다(ADR 0019).',
+      '오버로드 시그니처는 구현과 느슨하게만 맞춰 봐서 확인 없는 타입 주장이 된다(`unknown`을 돌려주는 구현에 `T`를 돌려주는 오버로드가 컴파일된다) — 입력마다 함수를 나누거나, 이름으로 인덱싱한 mapped type에서 찾아 부르거나, 합집합을 돌려주고 호출부가 좁힌다(ADR 0020).',
     ),
-    // `declare` 값 선언과 앰비언트 블록 안의 값. 블록 안의 interface·type(타입만인 보강)은 걸리지 않는다(ADR 0011이 허용한다)
+    // `declare` 값 선언, 앰비언트 블록 안의 값, 본문 없는 `declare module 'x';`(그 모듈에서 가져오는 것을 모두 any로 만든다 —
+    // `.ts`에서는 moduleDetection: force 때문에 tsc가 막지만, `.d.ts`에 예외를 열면 열린다). 블록 안의 interface·type(타입만인
+    // 보강)은 걸리지 않는다(ADR 0011이 허용한다)
     'no-ambient-value': bannedSyntax(
-      `${VALUE_DECLARATION}[declare=true], ${AMBIENT_BLOCK} ${VALUE_DECLARATION}`,
-      '앰비언트 값 선언(`declare const`·`declare function`…, `declare global`·`declare module` 안의 값)은 구현 없이 그 값이 있고 그 타입이라고 주장한다 — 값은 모듈에서 import하고, 바깥에서 오는 값(전역·환경 변수)은 unknown으로 받아 스키마로 파싱한다. 타입만인 선언(interface·type)은 된다(ADR 0019).',
+      `${VALUE_DECLARATION}[declare=true], ${AMBIENT_BLOCK} ${VALUE_DECLARATION}, ${AMBIENT_BLOCK}:not([body])`,
+      "앰비언트 값 선언(`declare const`·`declare function`…, `declare global`·`declare module` 안의 값)은 구현 없이 그 값이 있고 그 타입이라고 주장한다. 본문 없는 `declare module 'x';`는 그 모듈을 통째로 any로 만든다 — 값은 모듈에서 import하고, 바깥에서 오는 값(전역·환경 변수·타입 없는 패키지)은 unknown으로 받아 스키마로 파싱한다. 타입만인 선언(interface·type)은 된다(ADR 0020).",
     ),
   },
 };
 
-// `.d.ts` 파일 자체를 막는 규칙(ADR 0019). 그 안의 선언은 `declare` 없이도 앰비언트라 위의 셀렉터가 보지 못하고
+// `.d.ts` 파일 자체를 막는 규칙(ADR 0020). 그 안의 선언은 `declare` 없이도 앰비언트라 위의 셀렉터가 보지 못하고
 // (`export const c: number;`), 파일 이름으로만 가릴 수 있어서 `base`가 `.d.ts`에서만 켠다
 const declarationFile = bannedSyntax(
   'Program',
-  '`.d.ts`는 구현 없이 타입을 주장하고, 그 안의 선언은 `declare` 없이도 앰비언트라 다른 규칙이 보지 못한다 — 타입은 `.ts`에 두고, 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다(ADR 0019).',
+  '`.d.ts`는 구현 없이 타입을 주장하고, 그 안의 선언은 `declare` 없이도 앰비언트라 다른 규칙이 보지 못한다 — 타입은 `.ts`에 두고, 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다(ADR 0020).',
 );
 
 /**
@@ -127,7 +129,7 @@ export const base = defineConfig([
         'error',
         { 'ts-expect-error': true },
       ],
-      // 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0019) — typeClaims에 둔 규칙은 빠짐없이 켠다
+      // 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0020) — typeClaims에 둔 규칙은 빠짐없이 켠다
       ...Object.fromEntries(
         Object.keys(typeClaims.rules).map(
           name => [`${LOCAL_PLUGIN}/${name}`, 'error'] as const,
