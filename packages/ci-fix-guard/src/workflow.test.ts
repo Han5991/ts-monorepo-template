@@ -23,6 +23,18 @@ describe('verify 잡이 적은 이름과 경로', () => {
     );
     return lines.slice(start, end === -1 ? undefined : end).join('\n');
   };
+  /** 스텝이 보고서에 넘기는 기록 디렉터리(runner.temp 아래 이름) — 넘기지 않으면 throw한다 */
+  const ledgerDirOf = (step: string): string => {
+    const dir = new RegExp(
+      `${LEDGER_DIR_ENV}: \\$\\{\\{ runner\\.temp \\}\\}/(\\S+)`,
+    ).exec(step)?.[1];
+    if (dir === undefined) {
+      throw new Error(
+        `스텝이 ${LEDGER_DIR_ENV}로 기록 디렉터리를 넘기지 않는다`,
+      );
+    }
+    return dir;
+  };
 
   it('패치 전과 뒤에 보고서가 읽는 환경 변수로 기록할 곳을 넘긴다', () => {
     expect(text.match(new RegExp(`\\b${LEDGER_DIR_ENV}:`, 'g'))).toHaveLength(
@@ -46,16 +58,21 @@ describe('verify 잡이 적은 이름과 경로', () => {
   // 패치 전 기록 디렉터리는 두 스텝에 따로 적는다(이유는 워크플로의 그 자리에). 어긋나면 비교가 없는 디렉터리를 읽어 모든 패치를
   // 기록이 없다는 이유로 거부하고, 기록 스텝의 경고도 찍히지 않는다
   it('비교는 두 보고서가 기록한 디렉터리를 패치 전·뒤 순서로 읽는다', () => {
-    const recorded = new RegExp(
-      `${LEDGER_DIR_ENV}: \\$\\{\\{ runner\\.temp \\}\\}/(\\S+)`,
-    ).exec(stepNamed('Record tests before the patch'))?.[1];
+    const recorded = ledgerDirOf(stepNamed('Record tests before the patch'));
     const check = stepNamed('Full checks');
     const compared = new RegExp(
       `ci-fix-guard/src/cli\\.ts" "\\$RUNNER_TEMP/([^"]+)" "\\$${LEDGER_DIR_ENV}"`,
     ).exec(check)?.[1];
-    expect(recorded).toBeDefined();
     expect(compared).toBe(recorded);
     expect(check).toContain(`${LEDGER_DIR_ENV}:`);
+  });
+
+  // 같으면 패치 뒤 보고서가 같은 파일 이름으로 패치 전 기록을 덮어쓴다. 비교가 패치 뒤 결과끼리 맞대게 되어, 돌던 테스트를 끈 패치도
+  // 실패한 테스트의 파일을 고친 패치도 조용히 통과한다
+  it('패치 뒤 기록은 패치 전 기록과 다른 디렉터리에 남긴다', () => {
+    expect(ledgerDirOf(stepNamed('Full checks'))).not.toBe(
+      ledgerDirOf(stepNamed('Record tests before the patch')),
+    );
   });
 
   it('기본 브랜치에서 이 패키지를 꺼내 온다', () => {
