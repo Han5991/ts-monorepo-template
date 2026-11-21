@@ -25,9 +25,9 @@ status: accepted
 
 ## 이유
 
-AGENTS.md는 오류를 단언으로 덮지 말라고 적어 두었지만 실행 경로에는 그 규칙이 없었다. 이 규칙들을 켜기 전의 lint는 `as`와 `!`,
-설명을 붙인 `@ts-expect-error`를 그대로 통과시켰다(typescript-eslint 8.72.2에서 위반을 넣어 확인, 2026-11-21). 글로만 있는 규칙은
-잊힌다(ADR 0001).
+AGENTS.md는 오류를 단언으로 덮지 말라고 적어 두었지만 실행 경로에는 그 규칙이 없었다. typescript-eslint의 `recommended`에는 셋
+가운데 `ban-ts-comment`만 있고, 그 기본값은 설명을 붙인 `@ts-expect-error`를 허용한다. 그래서 `as`와 `!`, 설명을 붙인
+`@ts-expect-error`가 lint를 그대로 통과했다(위반을 넣어 확인). 글로만 있는 규칙은 잊힌다(ADR 0001).
 
 타입 오류 앞에서 가장 싼 길은 단언이고, 에이전트는 오류를 고치는 대신 그 길을 고른다(ADR 0007과 같은 이유). 단언은 오류를
 없애지 않고 컴파일할 때에서 실행할 때로 옮긴다. 엄격 타입 설정이 붙여 준 `| undefined`도 `!` 한 글자로 지워지면 켜 둔 의미가
@@ -35,3 +35,12 @@ AGENTS.md는 오류를 단언으로 덮지 말라고 적어 두었지만 실행 
 
 `as const`와 `satisfies`는 반대 방향이다. 값의 타입을 좁히거나 값이 타입에 맞는지 검사를 더할 뿐, 컴파일러의 판단을 뒤집지
 않는다.
+
+출처(typescript-eslint 8.72.2의 저장소 원본, 확인 2026-11-21):
+
+- `recommended`에 든 규칙:
+  https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/eslint-plugin/src/configs/flat/recommended.ts
+- `ban-ts-comment`의 기본값(`@ts-expect-error`는 설명이 있으면 허용, `@ts-ignore`·`@ts-nocheck`는 금지):
+  https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/eslint-plugin/docs/rules/ban-ts-comment.mdx
+- `consistent-type-assertions`는 const 단언을 늘 허용한다:
+  https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/v8.72.2/packages/eslint-plugin/docs/rules/consistent-type-assertions.mdx

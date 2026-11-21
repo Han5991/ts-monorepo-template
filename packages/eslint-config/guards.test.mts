@@ -144,6 +144,11 @@ describe('타입 오류를 덮는 문법', () => {
       "// @ts-ignore 이유를 적어도 막힌다\nexport const a: number = 'x';\n",
       TS_COMMENT,
     ],
+    [
+      '@ts-nocheck',
+      "// @ts-nocheck 이유를 적어도 막힌다\nexport const a: number = 'x';\n",
+      TS_COMMENT,
+    ],
   ])('%s — 막힌다', async (_, code, rule) => {
     expect(await ruleIds(DOMAIN, code)).toContain(rule);
   });
