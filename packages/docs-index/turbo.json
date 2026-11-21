@@ -2,14 +2,10 @@
   "$schema": "https://turbo.build/schema.json",
   "extends": ["//"],
   "tasks": {
-    // 색인 검사 테스트는 패키지 밖(AGENTS.md·docs/adr)을 읽는다. 입력으로 선언하지 않으면
-    // 그 파일만 바뀌었을 때 캐시가 맞아 어긋남을 놓친다.
+    // 이 패키지의 테스트는 저장소 전체를 읽는다(모든 문서·주석과 package.json들) — 입력이 저장소 전부라 캐시하지 않는다.
+    // 캐시하면 패키지 밖의 글만 바뀌었을 때 지난 결과가 그대로 통과해, 깨진 참조를 놓친다.
     "test": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/AGENTS.md",
-        "$TURBO_ROOT$/docs/adr/**"
-      ]
+      "cache": false
     }
   }
 }
