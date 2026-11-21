@@ -34,14 +34,31 @@ async function ruleIds(file: string, code: string): Promise<string[]> {
     throw new Error(`탐침은 저장소에 있는 파일 경로로 넣는다: ${file}`);
   }
   try {
-    const [result] = await eslint.lintText(code, { filePath });
-    if (!result) throw new Error(`lint 결과가 없다: ${file}`);
-    return result.messages
-      .filter(m => m.severity === 2)
-      .map(m => m.ruleId ?? `(fatal) ${m.message}`);
+    return await errorRuleIds(filePath, code);
   } finally {
     await eslint.lintText(readFileSync(filePath, 'utf8'), { filePath });
   }
+}
+
+/**
+ * 선언 파일 경로로 `code`를 lint한다. 선언 파일은 파일째 막혀(ADR 0020) 저장소에 없으니 `ruleIds`처럼 있는 파일로 넣을 수 없다.
+ * 타입 정보 블록이 선언 파일을 빼므로 project service 없이 파싱되고, 되돌릴 것도 없다. 그 블록에 선언 파일이 다시 들면 없는 경로라
+ * 파싱 오류가 나서 이것을 쓰는 테스트가 실패한다
+ */
+async function declarationFileRuleIds(
+  file: string,
+  code: string,
+): Promise<string[]> {
+  return errorRuleIds(path.join(ROOT, file), code);
+}
+
+/** 오류(severity 2)의 규칙 이름 — 파싱 오류처럼 규칙이 없는 오류는 `(fatal) 메시지`로 */
+async function errorRuleIds(filePath: string, code: string): Promise<string[]> {
+  const [result] = await eslint.lintText(code, { filePath });
+  if (!result) throw new Error(`lint 결과가 없다: ${filePath}`);
+  return result.messages
+    .filter(m => m.severity === 2)
+    .map(m => m.ruleId ?? `(fatal) ${m.message}`);
 }
 
 const FILE_KINDS = {
@@ -168,13 +185,12 @@ describe('도메인', () => {
     expect(await ruleIds(DOMAIN, code)).toContain('no-restricted-syntax');
   });
 
-  it('양성 대조 — 선언(상수·함수·오버로드·기본 내보내기 함수·타입·전역 타입·다시 내보내기)은 통과한다', async () => {
+  // 오버로드 시그니처는 공통 규칙이 막는다(ADR 0020) — 여기서는 함수 선언만 본다
+  it('양성 대조 — 선언(상수·함수·기본 내보내기 함수·타입·전역 타입·다시 내보내기)은 통과한다', async () => {
     expect(
       await ruleIds(
         DOMAIN,
         [
-          'export function f(a: string): string;',
-          'export function f(a: number): number;',
           'export function f(a: string | number) {',
           '  return a;',
           '}',
@@ -255,12 +271,15 @@ describe('타입 오류를 덮는 문법', () => {
   });
 });
 
-// 공통 규칙(base)이라 어느 패키지에서나 같다 — 컴파일러가 확인하지 않는 타입 주장도 막힌다(ADR 0018).
-// 매개변수는 `_x`로 쓴다. 타입에서만 쓰는 `x`는 no-unused-vars도 걸어서, 이 규칙이 없어도 막힌 것처럼 보인다
+// 공통 규칙(base)이라 어느 패키지에서나 같다 — 컴파일러가 확인하지 않는 타입 주장도 막힌다(ADR 0018·0020).
+// 매개변수는 `_x`로 쓴다 — 오늘 다른 규칙을 모두 통과하는 우회 꼴을 그대로 넣는다(`x`로 쓰면 no-unused-vars도 함께 걸린다)
 describe('컴파일러가 확인하지 않는 타입 주장', () => {
   const PREDICATE = 'local/no-type-predicate';
   const DEFINITE = 'local/no-definite-assignment-assertion';
   const DECLARE_FIELD = 'local/no-declare-field';
+  const OVERLOAD = 'local/no-overload-signature';
+  const AMBIENT = 'local/no-ambient-value';
+  const DECLARATION_FILE = 'local/no-declaration-file';
   const DOMAIN_TEST = 'packages/domain/src/task/task.test.ts';
   const TRUE_GUARD =
     'export const isText = (_x: unknown): _x is string => true;\n';
@@ -325,6 +344,51 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
       'export class Box {\n  declare n: number;\n}\n',
       DECLARE_FIELD,
     ],
+    // 오버로드는 구현과 느슨하게만 맞춰 본다 — unknown을 돌려주는 구현에 다른 타입을 돌려주는 오버로드가 컴파일된다
+    [
+      '함수 오버로드',
+      'export function parse(x: string): { a: string };\nexport function parse(x: unknown): unknown {\n  return x;\n}\n',
+      OVERLOAD,
+    ],
+    [
+      '메서드 오버로드',
+      'export class Box {\n  get(x: string): { a: string };\n  get(x: unknown): unknown {\n    return x;\n  }\n}\n',
+      OVERLOAD,
+    ],
+    [
+      '생성자 오버로드',
+      'export class Box {\n  constructor(x: string);\n  constructor(_x: unknown) {}\n}\n',
+      OVERLOAD,
+    ],
+    ['declare const', 'export declare const config: { a: string };\n', AMBIENT],
+    [
+      'declare function',
+      'export declare function parse(x: unknown): { a: string };\n',
+      AMBIENT,
+    ],
+    [
+      'declare class',
+      'export declare class Ext {\n  read(): string;\n}\n',
+      AMBIENT,
+    ],
+    ['declare enum', 'export declare enum Kind {\n  A,\n}\n', AMBIENT],
+    // lib 함수에 오버로드를 더한다 — parseInt(1)이 { a: string }으로 컴파일된다
+    [
+      'declare global 안의 함수',
+      'declare global {\n  function parseInt(x: unknown): { a: string };\n}\nexport {};\n',
+      AMBIENT,
+    ],
+    [
+      'declare module 안의 값',
+      "declare module 'virtual:probe' {\n  const src: string;\n  export default src;\n}\n",
+      AMBIENT,
+    ],
+    // 그 모듈에서 가져오는 것을 모두 any로 만든다(.d.ts에서 확인 — .ts에서는 moduleDetection: force라 tsc도 막는다)
+    [
+      '본문 없는 declare module',
+      "declare module 'untyped-lib';\nexport {};\n",
+      AMBIENT,
+    ],
   ])('%s — 막힌다', async (_, code, rule) => {
     expect(await ruleIds(DOMAIN, code)).toContain(rule);
   });
@@ -333,8 +397,32 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
     [PREDICATE, TRUE_GUARD],
     [DEFINITE, 'export let n!: number;\n'],
     [DECLARE_FIELD, 'export class Box {\n  declare n: number;\n}\n'],
+    [
+      OVERLOAD,
+      'export function parse(x: string): number;\nexport function parse(x: unknown): unknown {\n  return x;\n}\n',
+    ],
+    [AMBIENT, 'export declare const config: { a: string };\n'],
   ])('테스트 파일에서도 막힌다 — %s', async (rule, code) => {
     expect(await ruleIds(DOMAIN_TEST, code)).toContain(rule);
+  });
+
+  // 선언 파일 안의 선언은 declare 없이도 앰비언트다 — `export const c: number;`는 다른 규칙이 보지 못해서 파일째 막는다.
+  // TS는 .d.mts·.d.cts와 임의 확장자의 .d.<확장자>.ts도 선언 파일로 본다 — .d.ts만 잡으면 확장자만 바꿔 빠져나간다
+  const VALUE_CLAIM = 'export const c: number;\n';
+  it.each([
+    [
+      '타입만 담은 .d.ts',
+      'probe.d.ts',
+      'export interface Shape {\n  r: number;\n}\n',
+    ],
+    ['declare 없이 값을 주장하는 .d.ts', 'probe.d.ts', VALUE_CLAIM],
+    ['ESM 선언 파일 .d.mts', 'probe.d.mts', VALUE_CLAIM],
+    ['CommonJS 선언 파일 .d.cts', 'probe.d.cts', VALUE_CLAIM],
+    ['임의 확장자의 선언 파일 .d.css.ts', 'probe.d.css.ts', VALUE_CLAIM],
+  ])('%s — 막힌다', async (_, file, code) => {
+    expect(
+      await declarationFileRuleIds(`packages/domain/src/task/${file}`, code),
+    ).toContain(DECLARATION_FILE);
   });
 
   // no-restricted-syntax는 설정 블록마다 통째로 덮어써진다 — 이 규칙들이 공통 설정의 no-restricted-syntax에 있었다면 자기 목록을 둔
@@ -380,6 +468,37 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
           '  let chosen: number | undefined;',
           '  if (flag) chosen = 1;',
           '  return chosen;',
+          '}',
+          '',
+        ].join('\n'),
+      ),
+    ).toEqual([]);
+  });
+
+  // 타입만인 보강은 ADR 0011이 허용한다 — 앰비언트 블록을 통째로 막지 않는지, 본문 없는 abstract 메서드와 타입 수준 오버로드(TS가
+  // 대입할 때 확인한다)가 오버로드 규칙에 걸리지 않는지 본다
+  it('양성 대조 — 타입만인 declare global·declare module, abstract 메서드, 호출 시그니처 오버로드는 통과한다', async () => {
+    expect(
+      await ruleIds(
+        DOMAIN_TEST,
+        [
+          'declare global {',
+          '  interface Window {',
+          '    probe?: string;',
+          '  }',
+          '}',
+          "declare module 'virtual:probe' {",
+          '  interface Options {',
+          '    a: string;',
+          '  }',
+          '  type Id = string;',
+          '}',
+          'export abstract class Shape {',
+          '  abstract area(): number;',
+          '}',
+          'export interface Parse {',
+          '  (x: string): number;',
+          '  (x: number): string;',
           '}',
           '',
         ].join('\n'),

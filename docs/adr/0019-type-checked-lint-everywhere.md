@@ -9,7 +9,8 @@ status: accepted
 
 - 공통 설정(`base`)이 typescript-eslint의 타입 정보를 쓰는 규칙(`recommendedTypeChecked`에서 `recommended`를 뺀 몫인
   `recommendedTypeCheckedOnly`)을 모든 TS 파일에 오류로 켠다. 패키지마다 켜는 단계는 없다 — `base`를 펼치는 패키지는 새 패키지도
-  저절로 들어온다. 테스트 파일과 설정 파일(`eslint.config.mts`)도 예외가 아니다.
+  저절로 들어온다. 테스트 파일과 설정 파일(`eslint.config.mts`)도 예외가 아니다. 선언 파일(`.d.ts` 등)만 뺀다 — ADR 0020이
+  파일째 막아 이 규칙들이 볼 것이 없다.
   - 바깥 입력에서 흘러드는 `any` — `no-unsafe-member-access`·`no-unsafe-assignment`·`no-unsafe-argument`·`no-unsafe-return`·
     `no-unsafe-call`. `JSON.parse`·`res.json()`의 결과는 `unknown`으로 받아 좁힌다(ADR 0016). `unknown`에 넣는 것은 걸리지 않는다.
   - promise — `no-floating-promises`·`no-misused-promises`·`await-thenable`·`require-await`.

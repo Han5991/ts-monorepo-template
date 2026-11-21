@@ -54,8 +54,10 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
   `consistent-type-assertions`·`no-non-null-assertion`·`ban-ts-comment`
 - 컴파일러가 확인하지 않는 타입 주장도 막힌다 — 타입 서술(`x is T`·`asserts x`), 확정 대입(`x!: T`), `declare` 필드. 공통 설정이
   정의하는 `local/no-type-predicate`·`local/no-definite-assignment-assertion`·`local/no-declare-field`
+- 구현 없이 타입을 주장하는 선언도 막힌다 — 오버로드 시그니처, 앰비언트 값 선언(`declare const`·`declare function`, `declare global`
+  안의 값), 선언 파일(`.d.ts`·`.d.mts` 등). `local/no-overload-signature`·`local/no-ambient-value`·`local/no-declaration-file`
 - 바깥 입력(`JSON.parse`·`res.json()`)의 `any`를 타입 있는 자리로 흘리기, 기다리지 않은 promise, `'[object Object]'`로 찍히는
-  문자열 — typescript-eslint의 타입 정보 규칙(`recommendedTypeChecked`), 모든 TS 파일
+  문자열 — typescript-eslint의 타입 정보 규칙(`recommendedTypeChecked`), 모든 TS 파일(파일째 막히는 선언 파일은 뺀다)
 - lint 설정이 실제로 막는지 — `packages/eslint-config/guards.test.mts`가 위반을 넣어 확인한다(양성 대조 포함)
 - 상대 경로 import 금지(`#/` 별칭·패키지 이름만) — `no-restricted-imports`
 - 엄격 타입(`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes` 등) — `packages/tsconfig/base.json`
