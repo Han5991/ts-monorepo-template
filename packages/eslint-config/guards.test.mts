@@ -261,6 +261,11 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
       'export class Box {\n  get(x: string): { a: string };\n  get(x: unknown): unknown {\n    return x;\n  }\n}\n',
       OVERLOAD,
     ],
+    [
+      '생성자 오버로드',
+      'export class Box {\n  constructor(x: string);\n  constructor(_x: unknown) {}\n}\n',
+      OVERLOAD,
+    ],
     ['declare const', 'export declare const config: { a: string };\n', AMBIENT],
     [
       'declare function',
@@ -307,14 +312,23 @@ describe('컴파일러가 확인하지 않는 타입 주장', () => {
     expect(await ruleIds(DOMAIN_TEST, code)).toContain(rule);
   });
 
-  // .d.ts 안의 선언은 declare 없이도 앰비언트다 — `export const c: number;`는 다른 규칙이 보지 못해서 파일째 막는다
+  // 선언 파일 안의 선언은 declare 없이도 앰비언트다 — `export const c: number;`는 다른 규칙이 보지 못해서 파일째 막는다.
+  // TS는 .d.mts·.d.cts와 임의 확장자의 .d.<확장자>.ts도 선언 파일로 본다 — .d.ts만 잡으면 확장자만 바꿔 빠져나간다
+  const VALUE_CLAIM = 'export const c: number;\n';
   it.each([
-    ['타입만 담은 .d.ts', 'export interface Shape {\n  r: number;\n}\n'],
-    ['declare 없이 값을 주장하는 .d.ts', 'export const c: number;\n'],
-  ])('%s — 막힌다', async (_, code) => {
-    expect(
-      await ruleIds('packages/domain/src/task/probe.d.ts', code),
-    ).toContain(DECLARATION_FILE);
+    [
+      '타입만 담은 .d.ts',
+      'probe.d.ts',
+      'export interface Shape {\n  r: number;\n}\n',
+    ],
+    ['declare 없이 값을 주장하는 .d.ts', 'probe.d.ts', VALUE_CLAIM],
+    ['ESM 선언 파일 .d.mts', 'probe.d.mts', VALUE_CLAIM],
+    ['CommonJS 선언 파일 .d.cts', 'probe.d.cts', VALUE_CLAIM],
+    ['임의 확장자의 선언 파일 .d.css.ts', 'probe.d.css.ts', VALUE_CLAIM],
+  ])('%s — 막힌다', async (_, file, code) => {
+    expect(await ruleIds(`packages/domain/src/task/${file}`, code)).toContain(
+      DECLARATION_FILE,
+    );
   });
 
   // no-restricted-syntax는 설정 블록마다 통째로 덮어써진다 — 이 규칙들이 공통 설정의 no-restricted-syntax에 있었다면 자기 목록을 둔

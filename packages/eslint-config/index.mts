@@ -71,12 +71,18 @@ const typeClaims = {
   },
 };
 
-// `.d.ts` 파일 자체를 막는 규칙(ADR 0020). 그 안의 선언은 `declare` 없이도 앰비언트라 위의 셀렉터가 보지 못하고
-// (`export const c: number;`), 파일 이름으로만 가릴 수 있어서 `base`가 `.d.ts`에서만 켠다
+// 선언 파일 자체를 막는 규칙(ADR 0020). 그 안의 선언은 `declare` 없이도 앰비언트라 위의 셀렉터가 보지 못하고
+// (`export const c: number;`), 파일 이름으로만 가릴 수 있어서 `base`가 선언 파일에서만 켠다
 const declarationFile = bannedSyntax(
   'Program',
-  '`.d.ts`는 구현 없이 타입을 주장하고, 그 안의 선언은 `declare` 없이도 앰비언트라 다른 규칙이 보지 못한다 — 타입은 `.ts`에 두고, 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다(ADR 0020).',
+  '선언 파일(`.d.ts`·`.d.mts`·`.d.cts`·`.d.<확장자>.ts`)은 구현 없이 타입을 주장하고, 그 안의 선언은 `declare` 없이도 앰비언트라 다른 규칙이 보지 못한다 — 타입은 `.ts`에 두고, 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다(ADR 0020).',
 );
+
+/**
+ * TS가 선언 파일로 보는 이름 — `.d.ts`, `.d.mts`·`.d.cts`(TS 4.7), 임의 확장자의 선언 `.d.<확장자>.ts`(TS 5.0, `app.d.css.ts`).
+ * `.d.ts`만 잡으면 확장자만 바꿔 빠져나간다(TS 6.0.3에서 넷 모두 `export const c: number;`를 받는 것을 확인)
+ */
+const DECLARATION_FILES = ['**/*.d.{ts,mts,cts}', '**/*.d.*.ts'];
 
 /**
  * 공통 규칙. 각 앱·패키지는 자기 경로의 eslint.config.mts에서 `base`를 펼치고
@@ -138,7 +144,7 @@ export const base = defineConfig([
     },
   },
   {
-    files: ['**/*.d.ts'],
+    files: DECLARATION_FILES,
     rules: { [`${LOCAL_PLUGIN}/no-declaration-file`]: 'error' },
   },
 ]);

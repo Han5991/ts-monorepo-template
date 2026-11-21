@@ -13,7 +13,8 @@ status: accepted
     시그니처는 걸리지 않는다.
   - 앰비언트 값 선언 — `local/no-ambient-value`. `declare const`·`let`·`var`·`function`·`class`·`enum`, `declare global`·
     `declare module`·`declare namespace` 안의 같은 선언, 본문 없는 `declare module 'x';`(셀렉터 `[declare=true]:not([body])`)다.
-  - `.d.ts` 파일 — `local/no-declaration-file`. 파일 자체를 막는다(`.d.ts`에서만 켜고 셀렉터는 `Program`).
+  - 선언 파일(`.d.ts`·`.d.mts`·`.d.cts`·`.d.<확장자>.ts`) — `local/no-declaration-file`. 파일 자체를 막는다(선언 파일에서만 켜고
+    셀렉터는 `Program`).
 - 앰비언트 블록 안의 타입만인 선언(`interface`·`type`)은 그대로 허용한다. ADR 0011이 최상위에 둘 수 있는 선언으로 정한 "타입만인
   `declare global`·`declare module`"이고, 이제 그 "타입만인"을 lint가 지킨다.
 - 막히면 구현이 있는 코드로 바꾼다.
@@ -22,13 +23,13 @@ status: accepted
     키마다 확인한다. 조건부 반환 타입(`T extends string ? A : B`)은 대안이 아니다 — 구현에서 단언 없이 돌려줄 수 없다.
   - 앰비언트 값 대신 값은 모듈에서 import한다. 바깥에서 오는 값(전역·환경 변수·타입이 없는 패키지)은 `unknown`으로 받아 스키마로
     파싱하는 모듈을 하나 둔다.
-  - `.d.ts` 대신 타입은 `.ts`에 둔다. 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다.
+  - 선언 파일 대신 타입은 `.ts`에 둔다. 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다.
 - 셋도 ADR 0018의 규칙처럼 공통 설정 패키지가 정의하는 규칙이다(`no-restricted-syntax`가 아니다). 예외를 여는 방법은 ADR
   0007·0016과 같다.
 - 도메인의 `noTopLevelEffects`(ADR 0011)는 본문 없는 함수 선언을 계속 허용 선언으로 둔다. 부작용이 없는 선언이라 그 규칙의 판단으로는
   맞고, 이 결정의 예외를 연 경우에만 닿는다.
-- 가드 테스트(`packages/eslint-config/guards.test.mts`)가 꼴마다 막히는지, 테스트 파일에서도 막히는지, `.d.ts`가 타입만 담아도
-  막히는지, 타입만인 보강·abstract 메서드·호출 시그니처가 통과하는지(양성 대조)를 본다.
+- 가드 테스트(`packages/eslint-config/guards.test.mts`)가 꼴마다 막히는지, 테스트 파일에서도 막히는지, 선언 파일이 타입만 담아도
+  확장자를 바꿔도(`.d.mts`·`.d.cts`·`.d.css.ts`) 막히는지, 타입만인 보강·abstract 메서드·호출 시그니처가 통과하는지(양성 대조)를 본다.
 - lint가 못 보는 것 — 규칙으로만 남기고 리뷰에서 본다.
   - 타입만인 보강이 이미 있는 값에 없는 멤버를 더하는 것. `declare global { interface String { toTask(): Task } }`를 두면
     `'x'.toTask()`가 컴파일되고 실행하면 `TypeError`다. 라이브러리가 권하는 보강(전역 `Window`, 컨텍스트 변수 타입 등)도 같은
@@ -60,7 +61,9 @@ ADR 0018을 넣은 변경의 리뷰가 이 길을 짚었고, 위반을 넣어 �
 오류(TS2664)로 막지만, 그 설정이나 `.d.ts` 예외에 기대지 않도록 lint가 따로 막는다.
 
 `.d.ts`는 파일 안의 선언이 `declare` 없이도 앰비언트라, `export const c: number;`가 위 두 규칙 어디에도 걸리지 않았다(확인).
-셀렉터는 파일 이름을 모르므로 파일째 막는다. 이 저장소는 TS만 쓰고 `.d.ts`가 하나도 없어서, 필요해질 때 이유를 적고 여는 편이 싸다.
+셀렉터는 파일 이름을 모르므로 파일째 막는다. TS는 `.d.mts`·`.d.cts`(TS 4.7)와 임의 확장자의 `.d.<확장자>.ts`(TS 5.0)도 선언 파일로
+보므로 이름 패턴도 넷 모두다 — `.d.ts`만 잡으면 확장자만 바꿔 빠져나간다(#35 리뷰가 짚었고, TS 6.0.3에서 넷 모두
+`export const c: number;`를 받는 것을 확인). 이 저장소는 TS만 쓰고 선언 파일이 하나도 없어서, 필요해질 때 이유를 적고 여는 편이 싸다.
 
 타입만인 보강까지 막으면 ADR 0011이 허용한 선언을 거두고, 라이브러리가 권하는 확장 방식(모듈 보강)도 막게 된다. 그 꼴이 할 수 있는
 거짓은 이미 있는 값에 멤버를 더하는 것뿐이라 리뷰에서 본다.
@@ -76,3 +79,7 @@ ADR 0018을 넣은 변경의 리뷰가 이 길을 짚었고, 위반을 넣어 �
   https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/reference/Declaration%20Merging.md
 - TypeScript 핸드북 "Declaration Reference" — `declare function`·`declare class`는 이미 있는 값의 모양을 서술한다:
   https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/declaration-files/By%20Example.md
+- TypeScript 4.7 릴리스 노트 — 새 선언 파일 확장자 `.d.mts`·`.d.cts`:
+  https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/release-notes/TypeScript%204.7.md
+- TypeScript 5.0 릴리스 노트의 `allowArbitraryExtensions` — 임의 확장자의 선언 파일(`app.d.css.ts`):
+  https://raw.githubusercontent.com/microsoft/TypeScript-Website/v2/packages/documentation/copy/en/release-notes/TypeScript%205.0.md
