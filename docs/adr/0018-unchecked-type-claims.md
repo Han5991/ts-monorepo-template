@@ -11,8 +11,8 @@ status: accepted
   - 손으로 적은 타입 서술과 단언 시그니처(`x is T`·`this is T`·`asserts x is T`·`asserts x`) — `local/no-type-predicate`, 셀렉터
     `TSTypePredicate`. 함수 본문·오버로드·`declare`·타입 별칭 어디에 적었든 막는다.
   - 확정 대입 단언(`let x!: T`, 필드·`accessor` 필드 `x!: T`) — `local/no-definite-assignment-assertion`, 셀렉터 `[definite=true]`.
-  - `declare` 필드(`declare x: T`) — `local/no-declare-field`, 셀렉터 `PropertyDefinition[declare=true]`. `declare global`·
-    `declare module` 블록과 최상위 `declare` 값 선언은 이 규칙이 보지 않는다(아래 "lint가 못 보는 것").
+  - `declare` 필드(`declare x: T`) — `local/no-declare-field`, 셀렉터 `PropertyDefinition[declare=true]`. 최상위 `declare` 값
+    선언과 앰비언트 블록 안의 값은 이 규칙이 아니라 ADR 0019의 `local/no-ambient-value`가 막는다.
 - 막히면 컴파일러가 확인하는 코드로 바꾼다.
   - 가드가 필요하면 반환 타입을 적지 않는다. TS가 본문이 실제로 좁히는 만큼만 서술을 추론한다(`x => typeof x === 'string'`).
   - 문자열이 목록의 값인지는 목록에서 찾아 그 값을 돌려받는다(`NAMES.find(n => n === v)`, 타입은 `Name | undefined`).
@@ -27,13 +27,8 @@ status: accepted
 - 가드 테스트(`packages/eslint-config/guards.test.mts`)가 꼴마다 막히는지, 테스트 파일에서도 막히는지, 도메인의
   `no-restricted-syntax`와 함께 걸리는지, 추론된 서술·`find`·초기값·생성자 대입이 통과하는지(양성 대조)를 본다.
 - lint가 못 보는 것 — 규칙으로만 남기고 리뷰에서 본다.
-  - 오버로드 시그니처. 구현과 느슨하게만 맞춰 봐서 캐스트가 된다(`unknown`을 돌려주는 구현에 `T`를 돌려주는 오버로드가
-    컴파일된다). 정직한 오버로드와 가르는 셀렉터는 따로 정한다.
-  - 앰비언트 값 선언 — 최상위 `declare const`·`declare let`·`declare function`·`declare class`, `.d.ts`, `declare global`·
-    `declare module` 안의 함수·변수. 구현 없이 값이 있고 그 타입이라고 주장한다. `declare global`에 함수를 선언하면 lib 함수에
-    오버로드가 더해져 캐스트가 된다(`function parseInt(x: unknown): T`를 더하면 `parseInt(1)`이 `T`로 컴파일된다). 오버로드와
-    함께 따로 정한다.
   - 라이브러리에서 흘러드는 `any`(ADR 0016).
+- 이 결정 때 "lint가 못 보는 것"으로 남긴 오버로드 시그니처와 앰비언트 값 선언(`.d.ts` 포함)은 ADR 0019가 이어서 막는다.
 
 ## 이유
 

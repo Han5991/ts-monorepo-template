@@ -27,8 +27,14 @@ function bannedSyntax(selector: string, message: string): Rule.RuleModule {
  */
 const LOCAL_PLUGIN = 'local';
 
+/** 앰비언트 블록(`declare global`·`declare module`·`declare namespace`) — 안의 선언은 구현 없이 바깥에 있는 것을 서술한다 */
+const AMBIENT_BLOCK = 'TSModuleDeclaration[declare=true]';
+/** 실행할 때 값이 되는 선언 */
+const VALUE_DECLARATION =
+  ':matches(VariableDeclaration, TSDeclareFunction, ClassDeclaration, TSEnumDeclaration)';
+
 /**
- * 컴파일러가 확인하지 않는 타입 주장(ADR 0018) — 단언(`as`·`!`, ADR 0016)을 막은 뒤 같은 일을 하는 다른 문법이다.
+ * 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0019) — 단언(`as`·`!`, ADR 0016)을 막은 뒤 같은 일을 하는 다른 문법이다.
  * `base`가 여기 있는 규칙을 전부 켠다.
  */
 const typeClaims = {
@@ -44,14 +50,31 @@ const typeClaims = {
       '[definite=true]',
       '확정 대입 단언(`x!: T`)은 초기화 검사를 확인 없이 끈다 — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적어 쓰는 곳에서 확인한다(ADR 0018).',
     ),
-    // `x!: T`와 같은 일을 하는 다른 한 단어. `declare global`·`declare module` 블록과 최상위 `declare` 값 선언은 보지 않는다
-    // (ADR 0018의 "lint가 못 보는 것")
+    // `x!: T`와 같은 일을 하는 다른 한 단어. 최상위 `declare` 값 선언과 앰비언트 블록 안의 값은 no-ambient-value가 본다
     'no-declare-field': bannedSyntax(
       'PropertyDefinition[declare=true]',
       '`declare` 필드는 초기화 검사를 끄고, 실행할 때는 필드를 만들지 않는다(값이 undefined다) — 선언할 때 값을 주거나 생성자에서 대입하고, 없을 수 있으면 `| undefined`로 적는다(ADR 0018).',
     ),
+    // 본문 없는 함수·메서드 가운데 앰비언트가 아닌 것이 오버로드 시그니처다(TS는 구현이 바로 뒤따르게 한다). 앰비언트 쪽은
+    // no-ambient-value가, abstract 메서드는 노드가 달라(TSAbstractMethodDefinition) 걸리지 않는다
+    'no-overload-signature': bannedSyntax(
+      `TSDeclareFunction:not([declare=true]):not(${AMBIENT_BLOCK} TSDeclareFunction), MethodDefinition[value.type="TSEmptyBodyFunctionExpression"]:not(ClassDeclaration[declare=true] MethodDefinition):not(${AMBIENT_BLOCK} MethodDefinition)`,
+      '오버로드 시그니처는 구현과 느슨하게만 맞춰 봐서 확인 없는 타입 주장이 된다(`unknown`을 돌려주는 구현에 `T`를 돌려주는 오버로드가 컴파일된다) — 입력마다 함수를 나누거나, 이름으로 인덱싱한 mapped type에서 찾아 부르거나, 합집합을 돌려주고 호출부가 좁힌다(ADR 0019).',
+    ),
+    // `declare` 값 선언과 앰비언트 블록 안의 값. 블록 안의 interface·type(타입만인 보강)은 걸리지 않는다(ADR 0011이 허용한다)
+    'no-ambient-value': bannedSyntax(
+      `${VALUE_DECLARATION}[declare=true], ${AMBIENT_BLOCK} ${VALUE_DECLARATION}`,
+      '앰비언트 값 선언(`declare const`·`declare function`…, `declare global`·`declare module` 안의 값)은 구현 없이 그 값이 있고 그 타입이라고 주장한다 — 값은 모듈에서 import하고, 바깥에서 오는 값(전역·환경 변수)은 unknown으로 받아 스키마로 파싱한다. 타입만인 선언(interface·type)은 된다(ADR 0019).',
+    ),
   },
 };
+
+// `.d.ts` 파일 자체를 막는 규칙(ADR 0019). 그 안의 선언은 `declare` 없이도 앰비언트라 위의 셀렉터가 보지 못하고
+// (`export const c: number;`), 파일 이름으로만 가릴 수 있어서 `base`가 `.d.ts`에서만 켠다
+const declarationFile = bannedSyntax(
+  'Program',
+  '`.d.ts`는 구현 없이 타입을 주장하고, 그 안의 선언은 `declare` 없이도 앰비언트라 다른 규칙이 보지 못한다 — 타입은 `.ts`에 두고, 도구가 만드는 타입 참조(`/// <reference types="…" />`)는 tsconfig의 `types`로 옮긴다(ADR 0019).',
+);
 
 /**
  * 공통 규칙. 각 앱·패키지는 자기 경로의 eslint.config.mts에서 `base`를 펼치고
@@ -72,7 +95,9 @@ export const base = defineConfig([
     // noInlineConfig는 주석을 무시하고 경고만 내므로, "끈 줄 알았는데 안 꺼진" 죽은 주석이 남지 않게 주석 자체를 오류로 만든다
     plugins: {
       '@eslint-community/eslint-comments': eslintComments,
-      [LOCAL_PLUGIN]: typeClaims,
+      [LOCAL_PLUGIN]: {
+        rules: { ...typeClaims.rules, 'no-declaration-file': declarationFile },
+      },
     },
     linterOptions: { noInlineConfig: true, reportUnusedInlineConfigs: 'error' },
     rules: {
@@ -102,13 +127,17 @@ export const base = defineConfig([
         'error',
         { 'ts-expect-error': true },
       ],
-      // 컴파일러가 확인하지 않는 타입 주장(ADR 0018) — typeClaims에 둔 규칙은 빠짐없이 켠다
+      // 컴파일러가 확인하지 않는 타입 주장(ADR 0018·0019) — typeClaims에 둔 규칙은 빠짐없이 켠다
       ...Object.fromEntries(
         Object.keys(typeClaims.rules).map(
           name => [`${LOCAL_PLUGIN}/${name}`, 'error'] as const,
         ),
       ),
     },
+  },
+  {
+    files: ['**/*.d.ts'],
+    rules: { [`${LOCAL_PLUGIN}/no-declaration-file`]: 'error' },
   },
 ]);
 
