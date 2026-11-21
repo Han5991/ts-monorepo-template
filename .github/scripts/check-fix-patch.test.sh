@@ -54,6 +54,7 @@ expect reject '.github 수정' "printf 'name: ci2\n' >.github/workflows/ci.yml"
 expect reject 'it.skip 추가' "printf 'it.skip(\"a\", () => {});\n' >src/a.test.ts"
 expect reject 'describe.only 추가' "printf 'describe.only(\"a\", () => {});\n' >src/a.test.ts"
 expect reject '@ts-ignore 추가' "printf '// @ts-ignore\nexport const a = 1;\n' >src/a.ts"
+expect reject '설명을 붙인 @ts-expect-error 추가' "printf '// @ts-expect-error 이유를 적어도 거부한다\nexport const a = 1;\n' >src/a.ts"
 expect reject '모드 변경' "chmod +x src/a.ts"
 
 # 빈 패치

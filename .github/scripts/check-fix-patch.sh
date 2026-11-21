@@ -7,7 +7,7 @@
 #   - 새 파일·삭제·이름 바꾸기·모드 변경·심볼릭 링크·바이너리
 #   - 의존성·도구·CI 설정(package.json·lockfile·pnpm-workspace.yaml·.npmrc·.tool-versions·lefthook·.github·.claude·renovate)
 #     — CI를 고치는 데 필요 없고, 바꾸면 이후 잡이 실행할 코드가 달라진다
-#   - 테스트를 끄는 흔적(.skip·.only)과 타입 검사를 끄는 주석(@ts-ignore·@ts-nocheck)
+#   - 테스트를 끄는 흔적(.skip·.only)과 타입 검사를 끄는 주석(@ts-ignore·@ts-nocheck·@ts-expect-error — 설명을 붙여도)
 #   - 저장소에 적용되지 않는 패치
 #
 # 회귀 테스트: bash .github/scripts/check-fix-patch.test.sh (CI의 quality-checks가 돌린다)
@@ -36,7 +36,7 @@ done < <(sed -n 's#^diff --git a/\(.*\) b/.*$#\1#p' "$patch" | sort -u)
 
 added="$(grep -E '^\+[^+]' "$patch" || true)"
 grep -qE '\b(it|test|describe)\.(skip|only)\(' <<<"$added" && reasons+=("테스트 skip·only")
-grep -qE '@ts-(ignore|nocheck)' <<<"$added" && reasons+=("@ts-ignore·@ts-nocheck")
+grep -qE '@ts-(ignore|nocheck|expect-error)' <<<"$added" && reasons+=("@ts-ignore·@ts-nocheck·@ts-expect-error")
 
 if ((${#reasons[@]} == 0)) && ! git -c core.hooksPath=/dev/null apply --check -- "$patch" 2>/dev/null; then
   reasons+=("저장소에 적용되지 않는다")
