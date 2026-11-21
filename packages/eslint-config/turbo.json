@@ -2,6 +2,10 @@
   "$schema": "https://turbo.build/schema.json",
   "extends": ["//"],
   "tasks": {
+    // 이 패키지에는 자기 eslint.config.mts가 없어 루트 설정이 적용된다 — 그 파일이 바뀌면 캐시를 버린다
+    "lint": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/eslint.config.mts"]
+    },
     // 가드 테스트는 패키지 밖의 앱·패키지 lint 설정을 읽는다. 입력으로 선언하지 않으면
     // 그 설정만 바뀌었을 때(규칙을 지우거나 풀었을 때) 캐시가 맞아 통과해 버린다.
     "test": {
