@@ -1,32 +1,14 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { missingDocPaths, pathExists, repoPathsIn } from '#/docPaths.ts';
-import { REPO_ROOT, trackedFiles } from '#/repo.ts';
+import { docSources, REPO_ROOT, trackedFiles } from '#/repo.ts';
 import { describe, expect, it } from 'vitest';
 
 // 이 파일은 예시 경로를 글로 담고 있어 저장소 검사에서 뺀다
 const SELF = 'packages/docs-index/src/docPaths.test.ts';
-const TEXT_FILE = /\.(md|ts|mts|tsx|ya?ml|json|sh|py)$/;
-/**
- * 검사하지 않는 글 — CLAUDE.md는 AGENTS.md를 가리키는 링크라 같은 글을 두 번 본다. `.claude/skills/`는 원본 그대로 두는
- * 남의 스킬(scripts/init.ts가 손대지 않는다)이라 그 안의 경로는 원본 저장소의 것이다.
- */
-function scanned(file: string): boolean {
-  return (
-    TEXT_FILE.test(file) &&
-    file !== SELF &&
-    file !== 'CLAUDE.md' &&
-    !file.startsWith('.claude/skills/')
-  );
-}
 
 describe('저장소의 문서·주석 경로', () => {
   it('백틱으로 적은 저장소 경로가 모두 있다 — 파일을 옮기거나 지웠으면 가리키는 글도 고친다', () => {
     const files = trackedFiles(REPO_ROOT, '.');
-    const sources = files.filter(scanned).map(file => ({
-      path: file,
-      text: readFileSync(path.join(REPO_ROOT, file), 'utf8'),
-    }));
+    const sources = docSources(REPO_ROOT, files, [SELF]);
     expect(sources.length).toBeGreaterThan(0);
     expect(missingDocPaths(sources, files)).toEqual([]);
   });
