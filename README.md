@@ -57,6 +57,8 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - 엄격 타입(`noUncheckedIndexedAccess`·`exactOptionalPropertyTypes` 등) — `packages/tsconfig/base.json`
 - 결정 기록(ADR) 색인이 AGENTS.md와 맞는다 — 테스트 + 커밋 hook
 - 문서·주석에 백틱으로 적은 저장소 경로(`apps/`·`packages/`·`docs/` 등)가 실제로 있다 — 파일을 옮기면 가리키는 글이 낡지 않게, 테스트
+- 문서·주석이 가리킨 결정("ADR 번호")이 있고 대체되지 않았다, 백틱으로 적은 `pnpm` 명령이 돈다 — 결정을 대체하거나 스크립트
+  이름을 바꾸면 가리키는 글이 낡지 않게, 테스트
 - 커밋 전 포매팅, 푸시 전 전체 검사 — lefthook
 
 <!-- module:api:start -->
@@ -70,7 +72,7 @@ AI 에이전트가 작업해도 구조가 무너지지 않는 TypeScript 모노�
 - `packages/domain` — 엔티티·순수 규칙(zod만 의존). 서버와 클라이언트가 같이 쓴다
 - `packages/eslint-config` — 공통 lint 규칙 + `layers()` 경계 헬퍼 + 가드 테스트
 - `packages/tsconfig` — 공통 tsconfig 프리셋
-- `packages/docs-index` — `docs/adr` → AGENTS.md 결정 색인 생성·검사, 문서·주석의 저장소 경로 검사
+- `packages/docs-index` — `docs/adr` → AGENTS.md 결정 색인 생성·검사, 문서·주석이 가리키는 것(저장소 경로·ADR 번호·`pnpm` 명령) 검사
 - `docs/adr` — 설계 결정 기록
 
 <!-- module:api:start -->
@@ -116,7 +118,7 @@ UI 프레임워크와 스타일은 넣지 않았다 — 프로젝트마다 다�
   - `claude-code-review.yml` PR 코드 리뷰, `claude.yml` `@claude` 멘션 응답
   - `claude-ci-fix.yml` PR의 CI가 깨지면 고쳐서 자동 머지를 건다. 읽기 전용 Claude → LLM 없는 검사 → 코드를 실행하지
     않는 publish로 잡을 나누고, 이미 있는 파일의 수정만 받는다. 한 번만 시도하고, 못 고치면 멘션한다.
-  - `claude-deps-audit.yml` 매주 전이 의존성 취약점을 `pnpm overrides`로 막고 죽은 override를 정리해 PR을 연다(자동 머지).
+  - `claude-deps-audit.yml` 매주 전이 의존성 취약점을 pnpm의 `overrides`로 막고 죽은 override를 정리해 PR을 연다(자동 머지).
     저장소 설정 "Allow GitHub Actions to create and approve pull requests"가 켜져 있어야 한다.
   - 스킬(`.claude/skills/`, 외부 스킬은 각 폴더의 `SOURCE.md`에 출처)
 

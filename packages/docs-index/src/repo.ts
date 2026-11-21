@@ -1,7 +1,16 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { parseAdr, renderIndex, replaceIndex, validateAdrs } from '#/adr.ts';
+import { z } from 'zod';
+import {
+  parseAdr,
+  renderIndex,
+  replaceIndex,
+  validateAdrs,
+  type Adr,
+} from '#/adr.ts';
+import type { Workspace, Workspaces } from '#/docCommands.ts';
+import type { SourceText } from '#/docPaths.ts';
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '../../..');
 export const ADR_DIR = 'docs/adr';
@@ -37,14 +46,80 @@ export function agentsIndex(
   root: string,
   paths: readonly string[],
 ): { current: string; expected: string } {
+  const current = readFileSync(path.join(root, AGENTS_FILE), 'utf8');
+  return {
+    current,
+    expected: replaceIndex(
+      current,
+      renderIndex(readAdrs(root, paths), ADR_DIR),
+    ),
+  };
+}
+
+/** docs/adr의 결정들(형식·번호·대체 관계를 검사한 것) */
+export function readAdrs(root: string, paths: readonly string[]): Adr[] {
   const adrs = adrPaths(paths, ADR_DIR).map(p =>
     parseAdr(path.basename(p), readFileSync(path.join(root, p), 'utf8')),
   );
   validateAdrs(adrs);
+  return adrs;
+}
 
-  const current = readFileSync(path.join(root, AGENTS_FILE), 'utf8');
+const TEXT_FILE = /\.(md|ts|mts|tsx|ya?ml|json|sh|py)$/;
+
+/**
+ * 가리키는 것이 실제로 있는지 볼 글들(문서·코드·설정). 보지 않는 것 — CLAUDE.md는 AGENTS.md를 가리키는 링크라 같은 글을 두 번
+ * 본다. .claude/skills/ 아래는 원본 그대로 두는 남의 스킬(scripts/init.ts가 손대지 않는다)이라 그 안의 참조는 원본 저장소의 것이다.
+ * `except`에는 예시 참조를 글로 담은 파일(그 검사의 테스트 파일)을 넘긴다.
+ */
+export function docSources(
+  root: string,
+  files: readonly string[],
+  except: readonly string[],
+): SourceText[] {
+  return files
+    .filter(
+      file =>
+        TEXT_FILE.test(file) &&
+        file !== 'CLAUDE.md' &&
+        !file.startsWith('.claude/skills/') &&
+        !except.includes(file),
+    )
+    .map(file => ({
+      path: file,
+      text: readFileSync(path.join(root, file), 'utf8'),
+    }));
+}
+
+const PackageJson = z.object({
+  name: z.string().optional(),
+  scripts: z.record(z.string(), z.string()).default({}),
+  dependencies: z.record(z.string(), z.string()).default({}),
+  devDependencies: z.record(z.string(), z.string()).default({}),
+});
+
+function readWorkspace(root: string, file: string): Workspace {
+  const raw: unknown = JSON.parse(readFileSync(path.join(root, file), 'utf8'));
+  const json = PackageJson.parse(raw);
   return {
-    current,
-    expected: replaceIndex(current, renderIndex(adrs, ADR_DIR)),
+    name: json.name,
+    scripts: Object.keys(json.scripts),
+    tools: [
+      ...Object.keys(json.dependencies),
+      ...Object.keys(json.devDependencies),
+    ],
+  };
+}
+
+/** 루트와 워크스페이스 패키지(apps·packages 바로 아래)의 package.json */
+export function readWorkspaces(
+  root: string,
+  files: readonly string[],
+): Workspaces {
+  return {
+    root: readWorkspace(root, 'package.json'),
+    packages: files
+      .filter(file => /^(apps|packages)\/[^/]+\/package\.json$/.test(file))
+      .map(file => readWorkspace(root, file)),
   };
 }
