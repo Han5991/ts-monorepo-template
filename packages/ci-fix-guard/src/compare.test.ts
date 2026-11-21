@@ -125,14 +125,25 @@ describe('compareLedgers — 패치 전에 돌던 테스트는 패치 뒤에도 
     ).toEqual([`${TEST_FILE} > sum > 더한다 — ${reason}`]);
   });
 
+  const GONE =
+    '테스트가 사라졌다(지웠거나 이름을 바꿨다. 테스트를 이름으로 맞추므로 이름이 실행마다 바뀌는 테스트도 여기에 걸린다)';
+
   it('지우거나 이름을 바꾸면 사라진 것으로 본다', () => {
     expect(
       compare(BEFORE, [
         ledger([module([test('sum > 이름을 바꿈'), test('sum > 0')])]),
       ]),
-    ).toEqual([
-      `${TEST_FILE} > sum > 더한다 — 테스트가 사라졌다(지웠거나 이름을 바꿨다)`,
-    ]);
+    ).toEqual([`${TEST_FILE} > sum > 더한다 — ${GONE}`]);
+  });
+
+  it('이름이 실행마다 바뀌는 테스트(it.each가 시간·난수 값을 이름에 넣는 경우)도 사라진 것으로 본다 — 닫힌 쪽(사람에게 간다)으로 실패한다', () => {
+    const madeAt = (time: number) => test(`sum > ${String(time)}에 만든 값`);
+    expect(
+      compare(
+        [ledger([module([madeAt(1763704800000)])])],
+        [ledger([module([madeAt(1763704800123)])])],
+      ),
+    ).toEqual([`${TEST_FILE} > sum > 1763704800000에 만든 값 — ${GONE}`]);
   });
 
   it('테스트 파일을 불러오지 못하게 되면 그 이유로 알린다', () => {
